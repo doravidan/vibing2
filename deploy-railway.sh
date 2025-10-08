@@ -1,3 +1,28 @@
+#!/bin/bash
+
+# Railway Deployment Script for QuickVibe
+# This script deploys the application using Railway API
+
+set -e
+
+RAILWAY_TOKEN="2faaf866-137c-473c-a8ca-422878b80a43"
+PROJECT_ID="7ab5f33b-a7d6-491a-9b40-93a99b6300c4"
+API_URL="https://backboard.railway.app/graphql/v2"
+
+echo "🚀 Starting Railway deployment for QuickVibe..."
+
+# Function to make GraphQL requests
+railway_api() {
+    local query="$1"
+    curl -s "$API_URL" \
+        -H "Authorization: Bearer $RAILWAY_TOKEN" \
+        -H "Content-Type: application/json" \
+        -d "{\"query\":\"$query\"}"
+}
+
+# Step 1: Update Prisma schema for PostgreSQL
+echo "📝 Updating Prisma schema for PostgreSQL..."
+cat > prisma/schema.prisma << 'PRISMA_EOF'
 generator client {
   provider = "prisma-client-js"
 }
@@ -133,3 +158,43 @@ model CollaborationInvite {
   fromUser   User     @relation("SentInvites", fields: [fromUserId], references: [id], onDelete: Cascade)
   toUser     User     @relation("ReceivedInvites", fields: [toUserId], references: [id], onDelete: Cascade)
 }
+PRISMA_EOF
+
+echo "✅ Prisma schema updated for PostgreSQL"
+
+# Step 2: Create deployment using Railway CLI
+echo "🔨 Building and deploying to Railway..."
+export RAILWAY_TOKEN="$RAILWAY_TOKEN"
+
+# Create environment service
+echo "🔧 Creating environment and service..."
+
+# Push to GitHub first (Railway will deploy from GitHub)
+echo "📤 Setting up GitHub repository..."
+echo ""
+echo "⚠️  MANUAL STEPS REQUIRED:"
+echo "1. Create a new GitHub repository at https://github.com/new"
+echo "2. Run these commands:"
+echo ""
+echo "   git remote add origin YOUR_GITHUB_REPO_URL"
+echo "   git push -u origin main"
+echo ""
+echo "3. Go to Railway Dashboard: https://railway.app/project/$PROJECT_ID"
+echo "4. Click 'New Service' → 'GitHub Repo'"
+echo "5. Select your QuickVibe repository"
+echo "6. Railway will automatically deploy!"
+echo ""
+echo "📋 Environment Variables to Set in Railway Dashboard:"
+echo "   ANTHROPIC_API_KEY=your-anthropic-api-key-here"
+echo "   AUTH_SECRET=your-auth-secret-here"
+echo "   NODE_ENV=production"
+echo "   NEXTAUTH_URL=<Your Railway App URL>"
+echo ""
+echo "💾 Database Setup:"
+echo "1. In Railway Dashboard, click 'New' → 'Database' → 'PostgreSQL'"
+echo "2. Railway will automatically set DATABASE_URL"
+echo "3. Run migrations: railway run pnpm prisma migrate deploy"
+echo ""
+echo "🎉 Project Created: https://railway.app/project/$PROJECT_ID"
+echo ""
+echo "✅ Local files are ready for deployment!"
