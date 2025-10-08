@@ -1,0 +1,518 @@
+// QuickVibe 2.0 - Multi-tenant Database Schema
+// Production-ready schema with PFC token tracking
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+// User Plans
+enum Plan {
+  FREE
+  PRO
+  BUSINESS
+  ENTERPRISE
+}
+
+// Project Types
+enum ProjectType {
+  WEBSITE
+  MOBILE_APP
+  GAME
+  API
+  DASHBOARD
+}
+
+// Collaboration Roles
+enum CollaboratorRole {
+  OWNER
+  EDITOR
+  VIEWER
+}
+
+// Invitation Status
+enum InvitationStatus {
+  PENDING
+  ACCEPTED
+  DECLINED
+  EXPIRED
+}
+
+// Project Visibility
+enum ProjectVisibility {
+  PRIVATE
+  PUBLIC
+  UNLISTED
+}
+
+// Join Request Status
+enum RequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+// Competition Category
+enum CompetitionCategory {
+  GAME
+  WEB_APP
+  MOBILE_APP
+  TOOL
+  DASHBOARD
+  CREATIVE
+  AI_EXPERIMENT
+}
+
+// Competition Status
+enum CompetitionStatus {
+  DRAFT
+  UPCOMING
+  ACTIVE
+  VOTING
+  COMPLETED
+  CANCELLED
+}
+
+// User Model
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  name          String?
+  password      String?   // Hashed password for credentials auth
+  emailVerified DateTime?
+  image         String?
+  plan          Plan      @default(FREE)
+  tokenBalance  Int       @default(10000) // Free tier: 10K tokens
+  contextUsed   Float     @default(0)     // Current context usage %
+
+  // Billing
+  stripeCustomerId    String?   @unique
+  stripeSubscriptionId String?
+  subscriptionEnds    DateTime?
+
+  // Timestamps
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // Community & Rewards
+  tokenEarned       Int       @default(0)
+  competitionsWon   Int       @default(0)
+
+  // NextAuth relations
+  accounts      Account[]
+  sessions      Session[]
+
+  // Relations
+  projects          Project[]
+  usage             TokenUsage[]
+  collaborations    ProjectCollaborator[]
+  sentInvitations   ProjectInvitation[] @relation("InvitationSender")
+  receivedInvitations ProjectInvitation[] @relation("InvitationReceiver")
+  presenceSessions  PresenceSession[]
+  joinRequests      JoinRequest[]
+  projectForks      ProjectFork[]
+  competitionsCreated Competition[]
+  votes             CompetitionVote[]
+  ratings           ProjectRating[]
+  likes             ProjectLike[]
+
+  @@index([email])
+  @@index([plan])
+}
+
+// Project Model
+model Project {
+  id            String      @id @default(cuid())
+  name          String
+  description   String?
+  projectType   ProjectType
+
+  // Agent Configuration
+  activeAgents  String      // JSON string of active agent names
+
+  // Code Storage
+  currentCode   String      // Latest generated code
+  previewUrl    String?     // If deployed
+
+  // Metadata
+  userId        String
+  user          User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Timestamps
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  // Visibility & Discovery
+  visibility        ProjectVisibility  @default(PRIVATE)
+  allowJoinRequests Boolean            @default(false)
+  isFeatured        Boolean            @default(false)
+  viewCount         Int                @default(0)
+  likeCount         Int                @default(0)
+  forkCount         Int                @default(0)
+
+  // Competition
+  competitionId     String?
+  competition       Competition?       @relation(fields: [competitionId], references: [id])
+  submittedAt       DateTime?
+
+  // Relations
+  messages       Message[]
+  versions       Version[]
+  collaborators  ProjectCollaborator[]
+  invitations    ProjectInvitation[]
+  presenceSessions PresenceSession[]
+  joinRequests   JoinRequest[]
+  originalForks  ProjectFork[]       @relation("OriginalProject")
+  derivedForks   ProjectFork[]       @relation("ForkedProject")
+  ratings        ProjectRating[]
+  votes          CompetitionVote[]
+  likes          ProjectLike[]
+
+  @@index([userId])
+  @@index([projectType])
+  @@index([createdAt])
+  @@index([visibility])
+  @@index([competitionId])
+  @@index([isFeatured])
+}
+
+// Message Model - Chat history with PFC tracking
+model Message {
+  id            String    @id @default(cuid())
+  role          String    // 'user' | 'assistant'
+  content       String
+
+  // Author (for collaborative projects)
+  authorId      String?
+  authorName    String?   // Cached name for display
+
+  // PFC Metrics
+  tokensUsed    Int       @default(0)
+  contextAtTime Float     @default(0) // Context % when message was sent
+  pfcSaved      Int       @default(0) // Tokens saved by PFC vs traditional
+
+  // Relations
+  projectId     String
+  project       Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  // Timestamps
+  createdAt     DateTime  @default(now())
+
+  @@index([projectId])
+  @@index([createdAt])
+  @@index([authorId])
+}
+
+// Token Usage Tracking - For billing and analytics
+model TokenUsage {
+  id            String    @id @default(cuid())
+
+  // Usage Metrics
+  tokensUsed    Int
+  contextUsed   Float     // Context % at time of usage
+  savedTokens   Int       @default(0) // PFC savings
+
+  // Metadata
+  userId        String
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  endpoint      String    // Which API endpoint was used
+
+  // Timestamps
+  timestamp     DateTime  @default(now())
+
+  @@index([userId])
+  @@index([timestamp])
+}
+
+// Version Control - Track code iterations
+model Version {
+  id            String    @id @default(cuid())
+  versionNumber Int       @default(1)
+  code          String
+  description   String?
+
+  // Relations
+  projectId     String
+  project       Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  // Timestamps
+  createdAt     DateTime  @default(now())
+
+  @@index([projectId])
+  @@index([createdAt])
+  @@unique([projectId, versionNumber])
+}
+
+// Project Collaborators - Team members with roles
+model ProjectCollaborator {
+  id            String           @id @default(cuid())
+
+  // Relationships
+  userId        String
+  user          User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  projectId     String
+  project       Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  // Access control
+  role          CollaboratorRole
+
+  // Timestamps
+  joinedAt      DateTime         @default(now())
+  lastActiveAt  DateTime         @default(now())
+
+  @@unique([userId, projectId])
+  @@index([projectId])
+  @@index([userId])
+  @@index([role])
+}
+
+// Project Invitations - Invite system
+model ProjectInvitation {
+  id            String           @id @default(cuid())
+
+  // Sender and receiver
+  senderId      String
+  sender        User             @relation("InvitationSender", fields: [senderId], references: [id], onDelete: Cascade)
+  receiverEmail String           // Can invite non-users by email
+  receiverId    String?
+  receiver      User?            @relation("InvitationReceiver", fields: [receiverId], references: [id], onDelete: Cascade)
+
+  // Project
+  projectId     String
+  project       Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  // Invitation details
+  role          CollaboratorRole @default(EDITOR)
+  status        InvitationStatus @default(PENDING)
+  message       String?          // Optional invitation message
+
+  // Timestamps
+  createdAt     DateTime         @default(now())
+  expiresAt     DateTime?
+  respondedAt   DateTime?
+
+  @@index([receiverEmail])
+  @@index([receiverId])
+  @@index([projectId])
+  @@index([status])
+}
+
+// Real-time Presence - Track who's online in a project
+model PresenceSession {
+  id            String    @id @default(cuid())
+
+  // User and project
+  userId        String
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  projectId     String
+  project       Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  // Session info
+  socketId      String?   // WebSocket connection ID
+  isActive      Boolean   @default(true)
+  lastHeartbeat DateTime  @default(now())
+
+  // Cursor position (for live editing)
+  cursorLine    Int?
+  cursorColumn  Int?
+
+  // Timestamps
+  connectedAt   DateTime  @default(now())
+  disconnectedAt DateTime?
+
+  @@index([projectId, isActive])
+  @@index([userId])
+  @@index([socketId])
+}
+
+// Join Requests for Public Projects
+model JoinRequest {
+  id            String    @id @default(cuid())
+
+  projectId     String
+  project       Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  userId        String
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  message       String?
+  status        RequestStatus  @default(PENDING)
+  role          CollaboratorRole @default(VIEWER)
+
+  createdAt     DateTime  @default(now())
+  respondedAt   DateTime?
+  respondedBy   String?
+
+  @@unique([projectId, userId])
+  @@index([projectId, status])
+}
+
+// Project Forks (Remix/Clone)
+model ProjectFork {
+  id            String    @id @default(cuid())
+
+  originalId    String
+  original      Project   @relation("OriginalProject", fields: [originalId], references: [id], onDelete: Cascade)
+
+  forkId        String    @unique
+  fork          Project   @relation("ForkedProject", fields: [forkId], references: [id], onDelete: Cascade)
+
+  userId        String
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt     DateTime  @default(now())
+
+  @@index([originalId])
+  @@index([userId])
+}
+
+// Competitions
+model Competition {
+  id            String    @id @default(cuid())
+
+  title         String
+  description   String
+  category      CompetitionCategory
+
+  prompt        String
+  rules         String
+
+  // Prizes
+  firstPrize    Int
+  secondPrize   Int
+  thirdPrize    Int
+
+  // Timeline
+  startDate     DateTime
+  endDate       DateTime
+  votingEnds    DateTime
+
+  // Status
+  status        CompetitionStatus  @default(DRAFT)
+
+  // Creator
+  createdBy     String
+  creator       User      @relation(fields: [createdBy], references: [id], onDelete: Cascade)
+
+  // Stats
+  entryCount    Int       @default(0)
+  voteCount     Int       @default(0)
+
+  createdAt     DateTime  @default(now())
+
+  // Relations
+  submissions   Project[]
+  votes         CompetitionVote[]
+
+  @@index([category])
+  @@index([status])
+  @@index([endDate])
+}
+
+// Competition Votes
+model CompetitionVote {
+  id            String    @id @default(cuid())
+
+  competitionId String
+  competition   Competition @relation(fields: [competitionId], references: [id], onDelete: Cascade)
+
+  projectId     String
+  project       Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  userId        String
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Ratings (1-5 stars each)
+  efficiency    Int
+  design        Int
+  creativity    Int
+  functionality Int
+
+  comment       String?
+
+  createdAt     DateTime  @default(now())
+
+  @@unique([competitionId, projectId, userId])
+  @@index([competitionId])
+  @@index([projectId])
+}
+
+// Project Ratings (for non-competition projects)
+model ProjectRating {
+  id            String    @id @default(cuid())
+
+  projectId     String
+  project       Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  userId        String
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  rating        Int
+  comment       String?
+
+  createdAt     DateTime  @default(now())
+
+  @@unique([projectId, userId])
+  @@index([projectId])
+}
+
+// Project Likes
+model ProjectLike {
+  id            String    @id @default(cuid())
+
+  projectId     String
+  project       Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  userId        String
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt     DateTime  @default(now())
+
+  @@unique([projectId, userId])
+  @@index([projectId])
+}
+
+// NextAuth Account Model
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+}
+
+// NextAuth Session Model
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+// NextAuth Verification Token
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
