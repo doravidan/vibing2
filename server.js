@@ -2,6 +2,12 @@
  * Custom Next.js server with Socket.io
  */
 
+// Load environment variables explicitly (in priority order)
+// .env.development.local has highest priority, .env has lowest
+require('dotenv').config({ path: '.env', override: false });
+require('dotenv').config({ path: '.env.local', override: true });
+require('dotenv').config({ path: '.env.development.local', override: true });
+
 const { createServer } = require('http');
 const { parse } = require('url');
 const next = require('next');

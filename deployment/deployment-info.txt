@@ -1,0 +1,17 @@
+Deployment Information
+=====================
+Date: Mon Oct 13 14:25:04 IDT 2025
+Instance ID: i-0fe3933bc04811754
+Instance Name: vibing2-production-1760354673
+Public IP: 34.228.68.149
+Region: us-east-1
+Key Name: vibing2-key-1760354673
+Key Path: ~/.ssh/vibing2-key-1760354673.pem
+Security Group: sg-0057d2a76a93d99d2
+
+SSH Command:
+ssh -i ~/.ssh/vibing2-key-1760354673.pem ec2-user@34.228.68.149
+
+Application URLs:
+http://34.228.68.149:3000 (direct)
+http://34.228.68.149 (via nginx)

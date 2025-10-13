@@ -1,0 +1,104 @@
+VIBING2 SOFTWARE LICENSE AGREEMENT
+
+Copyright (c) 2025 Vibing2. All rights reserved.
+
+IMPORTANT: PLEASE READ THIS SOFTWARE LICENSE AGREEMENT ("LICENSE") CAREFULLY BEFORE
+USING THE VIBING2 APPLICATION. BY INSTALLING, COPYING, OR OTHERWISE USING THE
+SOFTWARE, YOU AGREE TO BE BOUND BY THE TERMS OF THIS LICENSE.
+
+1. DEFINITIONS
+   "Software" means the Vibing2 desktop application, including all its components,
+   documentation, and any updates or modifications.
+
+   "You" or "Your" means the individual or legal entity exercising permissions
+   granted by this License.
+
+2. LICENSE GRANT
+   Subject to the terms and conditions of this License, Vibing2 grants You a
+   limited, non-exclusive, non-transferable, revocable license to:
+
+   a) Install and use the Software on devices You own or control
+   b) Use the Software for personal or commercial purposes
+   c) Make one copy of the Software for backup purposes
+
+3. RESTRICTIONS
+   You may NOT:
+
+   a) Reverse engineer, decompile, or disassemble the Software
+   b) Modify, adapt, translate, or create derivative works of the Software
+   c) Rent, lease, lend, sell, redistribute, or sublicense the Software
+   d) Remove or alter any proprietary notices or labels on the Software
+   e) Use the Software in any way that violates applicable laws
+
+4. AI SERVICES
+   The Software integrates with third-party AI services. Your use of these
+   services is subject to:
+
+   a) Additional service-specific terms and conditions
+   b) API rate limits and usage quotas
+   c) Third-party provider privacy policies
+
+   You are responsible for obtaining necessary API keys and maintaining
+   compliance with third-party service terms.
+
+5. DATA AND PRIVACY
+   a) The Software processes data locally on Your device
+   b) AI service API calls are transmitted to third-party providers
+   c) You retain ownership of all content You create using the Software
+   d) Vibing2 does not collect, store, or sell Your personal data
+   e) See our Privacy Policy at https://vibing2.com/privacy for details
+
+6. UPDATES AND SUPPORT
+   a) Vibing2 may provide Software updates at its discretion
+   b) Updates may be automatically downloaded and installed
+   c) Support is provided on a best-effort basis via GitHub and Discord
+   d) Vibing2 is not obligated to provide maintenance or support
+
+7. INTELLECTUAL PROPERTY
+   a) The Software is licensed, not sold
+   b) Vibing2 retains all right, title, and interest in the Software
+   c) All trademarks, logos, and service marks are property of Vibing2
+   d) No license to Vibing2 patents or copyrights is granted
+
+8. DISCLAIMER OF WARRANTIES
+   THE SOFTWARE IS PROVIDED "AS IS" WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+   IMPLIED, INCLUDING BUT NOT LIMITED TO WARRANTIES OF MERCHANTABILITY, FITNESS
+   FOR A PARTICULAR PURPOSE, AND NON-INFRINGEMENT. VIBING2 DOES NOT WARRANT
+   THAT THE SOFTWARE WILL BE ERROR-FREE OR UNINTERRUPTED.
+
+9. LIMITATION OF LIABILITY
+   TO THE MAXIMUM EXTENT PERMITTED BY LAW, IN NO EVENT SHALL VIBING2 BE LIABLE
+   FOR ANY SPECIAL, INCIDENTAL, INDIRECT, OR CONSEQUENTIAL DAMAGES WHATSOEVER
+   (INCLUDING, WITHOUT LIMITATION, DAMAGES FOR LOSS OF BUSINESS PROFITS,
+   BUSINESS INTERRUPTION, LOSS OF BUSINESS INFORMATION, OR ANY OTHER PECUNIARY
+   LOSS) ARISING OUT OF THE USE OF OR INABILITY TO USE THE SOFTWARE, EVEN IF
+   VIBING2 HAS BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGES.
+
+10. THIRD-PARTY SOFTWARE
+    The Software includes third-party open source components. These components
+    are subject to their respective licenses. See THIRD_PARTY_LICENSES.txt for
+    details.
+
+11. TERMINATION
+    a) This License is effective until terminated
+    b) This License terminates automatically if You fail to comply with its terms
+    c) Upon termination, You must destroy all copies of the Software
+    d) Sections 7, 8, 9, and 12 survive termination
+
+12. GENERAL
+    a) This License is governed by the laws of [Your Jurisdiction]
+    b) This License constitutes the entire agreement between You and Vibing2
+    c) If any provision is found invalid, the remaining provisions remain in effect
+    d) Vibing2 may modify this License by providing notice through the Software
+
+13. CONTACT
+    For questions about this License, contact:
+
+    Email: legal@vibing2.com
+    Website: https://vibing2.com
+    GitHub: https://github.com/vibing2/vibing2
+
+BY INSTALLING OR USING THE SOFTWARE, YOU ACKNOWLEDGE THAT YOU HAVE READ THIS
+LICENSE, UNDERSTAND IT, AND AGREE TO BE BOUND BY ITS TERMS AND CONDITIONS.
+
+Last Updated: 2025-10-13

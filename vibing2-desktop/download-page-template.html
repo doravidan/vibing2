@@ -1,0 +1,511 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Download Vibing2 - AI-Powered Development Platform for macOS">
+    <meta property="og:title" content="Download Vibing2">
+    <meta property="og:description" content="Build web applications with AI assistance. 154 specialized agents, 70% cost savings.">
+    <meta property="og:image" content="https://vibing2.com/og-image.png">
+    <title>Download Vibing2 - AI Development Platform</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #0A0A0A 0%, #1A1A1A 100%);
+            color: #FFFFFF;
+            line-height: 1.6;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        header {
+            text-align: center;
+            padding: 4rem 0;
+        }
+
+        .logo {
+            width: 120px;
+            height: 120px;
+            margin: 0 auto 2rem;
+            border-radius: 24px;
+            box-shadow: 0 8px 32px rgba(74, 158, 255, 0.3);
+        }
+
+        h1 {
+            font-size: 3rem;
+            font-weight: 700;
+            margin-bottom: 1rem;
+            background: linear-gradient(135deg, #4A9EFF 0%, #10B981 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .tagline {
+            font-size: 1.25rem;
+            color: #A0A0A0;
+            margin-bottom: 3rem;
+        }
+
+        .version-info {
+            display: inline-flex;
+            align-items: center;
+            background: rgba(74, 158, 255, 0.1);
+            border: 1px solid rgba(74, 158, 255, 0.3);
+            padding: 0.5rem 1rem;
+            border-radius: 24px;
+            margin-bottom: 2rem;
+        }
+
+        .version-badge {
+            color: #4A9EFF;
+            font-weight: 600;
+            margin-right: 0.5rem;
+        }
+
+        .download-section {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 16px;
+            padding: 3rem;
+            margin: 2rem 0;
+        }
+
+        .download-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 2rem;
+            margin-top: 2rem;
+        }
+
+        .download-card {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            padding: 2rem;
+            text-align: center;
+            transition: all 0.3s ease;
+        }
+
+        .download-card:hover {
+            background: rgba(255, 255, 255, 0.05);
+            border-color: #4A9EFF;
+            transform: translateY(-4px);
+            box-shadow: 0 12px 24px rgba(74, 158, 255, 0.2);
+        }
+
+        .download-card.recommended {
+            border: 2px solid #4A9EFF;
+            background: rgba(74, 158, 255, 0.05);
+        }
+
+        .recommended-badge {
+            display: inline-block;
+            background: #4A9EFF;
+            color: #000;
+            padding: 0.25rem 0.75rem;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            margin-bottom: 1rem;
+        }
+
+        .card-icon {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+        }
+
+        .card-title {
+            font-size: 1.5rem;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+        }
+
+        .card-description {
+            color: #A0A0A0;
+            margin-bottom: 1rem;
+            font-size: 0.9rem;
+        }
+
+        .card-size {
+            color: #666;
+            font-size: 0.85rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .download-button {
+            display: inline-block;
+            background: #4A9EFF;
+            color: #000;
+            padding: 1rem 2rem;
+            border-radius: 8px;
+            text-decoration: none;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            border: none;
+            cursor: pointer;
+            font-size: 1rem;
+        }
+
+        .download-button:hover {
+            background: #3D8FE8;
+            transform: scale(1.05);
+        }
+
+        .secondary-button {
+            background: transparent;
+            border: 1px solid #4A9EFF;
+            color: #4A9EFF;
+            margin-left: 0.5rem;
+        }
+
+        .secondary-button:hover {
+            background: rgba(74, 158, 255, 0.1);
+        }
+
+        .system-requirements {
+            margin-top: 3rem;
+            padding: 2rem;
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: 12px;
+        }
+
+        .requirements-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1.5rem;
+            margin-top: 1.5rem;
+        }
+
+        .requirement-item {
+            display: flex;
+            align-items: flex-start;
+        }
+
+        .requirement-icon {
+            color: #4A9EFF;
+            margin-right: 1rem;
+            font-size: 1.5rem;
+        }
+
+        .requirement-text h4 {
+            font-size: 1rem;
+            margin-bottom: 0.25rem;
+        }
+
+        .requirement-text p {
+            color: #A0A0A0;
+            font-size: 0.9rem;
+        }
+
+        .verification-section {
+            margin-top: 3rem;
+            padding: 2rem;
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: 12px;
+            border-left: 4px solid #10B981;
+        }
+
+        .code-block {
+            background: #000;
+            padding: 1rem;
+            border-radius: 8px;
+            overflow-x: auto;
+            font-family: 'Monaco', 'Courier New', monospace;
+            font-size: 0.85rem;
+            margin: 1rem 0;
+            color: #10B981;
+        }
+
+        .features-section {
+            margin-top: 3rem;
+            text-align: center;
+        }
+
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 2rem;
+            margin-top: 2rem;
+        }
+
+        .feature-item {
+            padding: 1rem;
+        }
+
+        .feature-icon {
+            font-size: 2.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .feature-title {
+            font-size: 1.1rem;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+        }
+
+        .feature-description {
+            color: #A0A0A0;
+            font-size: 0.9rem;
+        }
+
+        footer {
+            text-align: center;
+            padding: 3rem 0;
+            color: #666;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+            margin-top: 4rem;
+        }
+
+        .footer-links {
+            display: flex;
+            justify-content: center;
+            gap: 2rem;
+            margin-top: 1rem;
+        }
+
+        .footer-links a {
+            color: #A0A0A0;
+            text-decoration: none;
+            transition: color 0.3s ease;
+        }
+
+        .footer-links a:hover {
+            color: #4A9EFF;
+        }
+
+        @media (max-width: 768px) {
+            h1 {
+                font-size: 2rem;
+            }
+
+            .download-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .download-section {
+                padding: 1.5rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <img src="icon.png" alt="Vibing2 Logo" class="logo">
+            <h1>Download Vibing2</h1>
+            <p class="tagline">AI-Powered Development Platform for macOS</p>
+            <div class="version-info">
+                <span class="version-badge">Latest Version</span>
+                <span id="version">v1.0.0</span>
+            </div>
+        </header>
+
+        <section class="download-section">
+            <h2 style="text-align: center; margin-bottom: 1rem;">Choose Your Download</h2>
+            <p style="text-align: center; color: #A0A0A0; margin-bottom: 2rem;">
+                Select the version optimized for your Mac
+            </p>
+
+            <div class="download-grid">
+                <div class="download-card recommended">
+                    <span class="recommended-badge">Recommended</span>
+                    <div class="card-icon">💻</div>
+                    <h3 class="card-title">Universal Binary</h3>
+                    <p class="card-description">
+                        Works on both Intel and Apple Silicon Macs.<br>
+                        Best choice for most users.
+                    </p>
+                    <p class="card-size">~150 MB</p>
+                    <a href="https://github.com/vibing2/vibing2/releases/latest/download/Vibing2-universal.dmg"
+                       class="download-button" id="download-universal">
+                        Download Universal
+                    </a>
+                </div>
+
+                <div class="download-card">
+                    <div class="card-icon">🚀</div>
+                    <h3 class="card-title">Apple Silicon</h3>
+                    <p class="card-description">
+                        Optimized for M1, M2, M3, and M4 chips.<br>
+                        Best performance on Apple Silicon.
+                    </p>
+                    <p class="card-size">~120 MB</p>
+                    <a href="https://github.com/vibing2/vibing2/releases/latest/download/Vibing2-aarch64-apple-darwin.dmg"
+                       class="download-button" id="download-arm">
+                        Download ARM64
+                    </a>
+                </div>
+
+                <div class="download-card">
+                    <div class="card-icon">⚙️</div>
+                    <h3 class="card-title">Intel</h3>
+                    <p class="card-description">
+                        For Intel-based Macs (2020 and earlier).<br>
+                        Full compatibility with Intel processors.
+                    </p>
+                    <p class="card-size">~110 MB</p>
+                    <a href="https://github.com/vibing2/vibing2/releases/latest/download/Vibing2-x86_64-apple-darwin.dmg"
+                       class="download-button" id="download-intel">
+                        Download x86_64
+                    </a>
+                </div>
+            </div>
+
+            <div style="text-align: center; margin-top: 2rem;">
+                <a href="https://github.com/vibing2/vibing2/releases" class="secondary-button">
+                    View All Releases
+                </a>
+                <a href="release-notes.html" class="secondary-button">
+                    Release Notes
+                </a>
+            </div>
+        </section>
+
+        <section class="system-requirements">
+            <h2>System Requirements</h2>
+            <div class="requirements-grid">
+                <div class="requirement-item">
+                    <span class="requirement-icon">🖥️</span>
+                    <div class="requirement-text">
+                        <h4>Operating System</h4>
+                        <p>macOS 11.0 (Big Sur) or later</p>
+                    </div>
+                </div>
+                <div class="requirement-item">
+                    <span class="requirement-icon">💾</span>
+                    <div class="requirement-text">
+                        <h4>Memory</h4>
+                        <p>4GB RAM minimum, 8GB recommended</p>
+                    </div>
+                </div>
+                <div class="requirement-item">
+                    <span class="requirement-icon">💿</span>
+                    <div class="requirement-text">
+                        <h4>Storage</h4>
+                        <p>500MB free disk space</p>
+                    </div>
+                </div>
+                <div class="requirement-item">
+                    <span class="requirement-icon">🌐</span>
+                    <div class="requirement-text">
+                        <h4>Internet</h4>
+                        <p>Required for AI features and updates</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section class="verification-section">
+            <h2>Verify Your Download</h2>
+            <p style="margin-top: 1rem;">
+                For security, verify the integrity of your download using SHA-256 checksums:
+            </p>
+            <div class="code-block" id="checksums">
+# Universal Binary
+shasum -a 256 Vibing2-universal.dmg
+# Expected: [checksum will be displayed here]
+
+# Apple Silicon
+shasum -a 256 Vibing2-aarch64-apple-darwin.dmg
+# Expected: [checksum will be displayed here]
+
+# Intel
+shasum -a 256 Vibing2-x86_64-apple-darwin.dmg
+# Expected: [checksum will be displayed here]
+            </div>
+        </section>
+
+        <section class="features-section">
+            <h2>What's Included</h2>
+            <div class="features-grid">
+                <div class="feature-item">
+                    <div class="feature-icon">🤖</div>
+                    <h3 class="feature-title">154 AI Agents</h3>
+                    <p class="feature-description">Specialized agents for every development task</p>
+                </div>
+                <div class="feature-item">
+                    <div class="feature-icon">💰</div>
+                    <h3 class="feature-title">70% Cost Savings</h3>
+                    <p class="feature-description">Efficient AI usage with smart caching</p>
+                </div>
+                <div class="feature-item">
+                    <div class="feature-icon">🔒</div>
+                    <h3 class="feature-title">100% Local Data</h3>
+                    <p class="feature-description">Your projects stay on your machine</p>
+                </div>
+                <div class="feature-item">
+                    <div class="feature-icon">⚡</div>
+                    <h3 class="feature-title">Real-time Preview</h3>
+                    <p class="feature-description">See changes instantly as you build</p>
+                </div>
+                <div class="feature-item">
+                    <div class="feature-icon">🎨</div>
+                    <h3 class="feature-title">Modern UI</h3>
+                    <p class="feature-description">Beautiful, intuitive interface</p>
+                </div>
+                <div class="feature-item">
+                    <div class="feature-icon">🔄</div>
+                    <h3 class="feature-title">Auto Updates</h3>
+                    <p class="feature-description">Always up to date with latest features</p>
+                </div>
+            </div>
+        </section>
+
+        <footer>
+            <p>&copy; 2025 Vibing2. All rights reserved.</p>
+            <div class="footer-links">
+                <a href="https://vibing2.com">Website</a>
+                <a href="https://vibing2.com/docs">Documentation</a>
+                <a href="https://github.com/vibing2/vibing2">GitHub</a>
+                <a href="https://discord.gg/vibing2">Discord</a>
+                <a href="https://vibing2.com/privacy">Privacy</a>
+                <a href="https://vibing2.com/terms">Terms</a>
+            </div>
+        </footer>
+    </div>
+
+    <script>
+        // Fetch latest version and update page
+        fetch('https://api.github.com/repos/vibing2/vibing2/releases/latest')
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById('version').textContent = data.tag_name;
+
+                // Update download links with correct version
+                const version = data.tag_name;
+                document.getElementById('download-universal').href =
+                    `https://github.com/vibing2/vibing2/releases/download/${version}/Vibing2-universal-${version.substring(1)}.dmg`;
+                document.getElementById('download-arm').href =
+                    `https://github.com/vibing2/vibing2/releases/download/${version}/Vibing2-aarch64-apple-darwin-${version.substring(1)}.dmg`;
+                document.getElementById('download-intel').href =
+                    `https://github.com/vibing2/vibing2/releases/download/${version}/Vibing2-x86_64-apple-darwin-${version.substring(1)}.dmg`;
+            })
+            .catch(error => console.error('Error fetching version:', error));
+
+        // Detect user's architecture and highlight appropriate download
+        const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
+        const isAppleSilicon = navigator.userAgent.includes('Mac OS X') &&
+                               (navigator.userAgent.includes('ARM') ||
+                                navigator.platform.includes('Mac') &&
+                                window.navigator.maxTouchPoints > 1);
+
+        // Add visual indicator for detected platform
+        if (isMac && isAppleSilicon) {
+            document.querySelector('.download-card:nth-child(2)').style.borderColor = '#10B981';
+        }
+    </script>
+</body>
+</html>

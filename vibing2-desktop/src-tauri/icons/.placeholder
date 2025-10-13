@@ -1,0 +1,33 @@
+# Vibing2 Desktop Icons
+
+## Quick Start
+
+```bash
+# Open the icon generator
+open generate-icon.html
+
+# OR use Node.js generator (requires: npm install canvas)
+node generate-basic-icon.js
+
+# Then generate platform-specific icons
+cd ../..
+pnpm tauri icon src-tauri/icons/icon.png
+```
+
+## What's Here
+
+- **generate-icon.html** - Interactive browser-based icon generator (RECOMMENDED)
+- **generate-basic-icon.js** - Node.js script for generating icons
+- **icon.svg** - Vector source file
+- **README.md** - Quick reference guide
+- **DESIGN_SPEC.md** - Complete design specifications
+
+## Design Overview
+
+The Vibing2 icon features:
+- V2 lettermark (brand recognition)
+- Wave lines (AI vibration/activity)
+- Sparkle dots (innovation)
+- Purple-to-pink gradient (#8B5CF6 → #EC4899)
+
+See README.md or ../ICON_DESIGN_GUIDE.md for complete documentation.

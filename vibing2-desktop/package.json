@@ -1,0 +1,52 @@
+{
+  "name": "vibing2-desktop",
+  "version": "1.0.0",
+  "description": "Vibing2 Desktop - Self-contained AI Development Platform for macOS",
+  "type": "module",
+  "scripts": {
+    "tauri": "tauri",
+    "dev": "vite & tauri dev",
+    "dev:vite": "vite",
+    "dev:tauri": "tauri dev",
+    "build": "tsc && vite build && tauri build",
+    "build:frontend": "tsc && vite build",
+    "build:next": "cd .. && pnpm run build",
+    "prebuild": "pnpm run copy:assets",
+    "copy:assets": "node scripts/copy-assets.js",
+    "build:dmg": "./scripts/build-dmg.sh",
+    "sign": "./scripts/sign-and-notarize.sh",
+    "version:patch": "./scripts/version-bump.sh patch",
+    "version:minor": "./scripts/version-bump.sh minor",
+    "version:major": "./scripts/version-bump.sh major",
+    "release": "pnpm run build:dmg && pnpm run sign",
+    "release:test": "./scripts/build-dmg.sh --open"
+  },
+  "keywords": [
+    "tauri",
+    "ai",
+    "desktop",
+    "macos"
+  ],
+  "author": "Vibing2",
+  "license": "MIT",
+  "dependencies": {
+    "@tauri-apps/api": "^2.8.0",
+    "@tauri-apps/cli": "^2.8.4",
+    "@tauri-apps/plugin-dialog": "^2.4.0",
+    "@tauri-apps/plugin-fs": "^2.4.2",
+    "@tauri-apps/plugin-shell": "^2.3.1",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "@vitejs/plugin-react": "^4.3.3",
+    "autoprefixer": "^10.4.20",
+    "postcss": "^8.4.49",
+    "sharp": "^0.34.4",
+    "tailwindcss": "^3.4.15",
+    "typescript": "^5.6.3",
+    "vite": "^5.4.11"
+  }
+}

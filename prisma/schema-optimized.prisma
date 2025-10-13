@@ -1,0 +1,238 @@
+generator client {
+  provider = "prisma-client-js"
+  previewFeatures = ["metrics", "tracing"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String    @unique
+  emailVerified DateTime?
+  password      String
+  image         String?
+  plan          String    @default("FREE")
+  tokenBalance  Int       @default(10000)
+  contextUsed   Float     @default(0)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  projects      Project[]
+  tokenUsage    TokenUsage[]
+  accounts      Account[]
+  sessions      Session[]
+  collaborations ProjectCollaborator[]
+  sentInvites   CollaborationInvite[] @relation("SentInvites")
+  receivedInvites CollaborationInvite[] @relation("ReceivedInvites")
+
+  // Optimization indexes
+  @@index([email, password]) // For login queries
+  @@index([createdAt]) // For user analytics
+  @@index([plan]) // For plan-based filtering
+}
+
+model Account {
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([provider, providerAccountId])
+  @@index([userId]) // For user account lookups
+}
+
+model Session {
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([userId]) // For user session lookups
+  @@index([expires]) // For session cleanup
+}
+
+model VerificationToken {
+  identifier String
+  token      String
+  expires    DateTime
+
+  @@id([identifier, token])
+  @@index([expires]) // For token cleanup
+}
+
+model Project {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  projectType String
+  activeAgents String  @default("[]")
+  currentCode String?  @db.Text // Deprecated - use ProjectFile instead
+  visibility  String   @default("PRIVATE")
+  likes       Int      @default(0)
+  forks       Int      @default(0)
+
+  // Additional fields for optimization
+  likeCount   Int      @default(0)
+  forkCount   Int      @default(0)
+  viewCount   Int      @default(0)
+  isFeatured  Boolean  @default(false)
+  previewUrl  String?
+
+  userId      String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages    Message[]
+  files       ProjectFile[]
+  collaborators ProjectCollaborator[]
+  invites     CollaborationInvite[]
+  competition Competition?
+
+  // Existing indexes (keep these)
+  @@index([userId])
+  @@index([visibility, updatedAt])
+  @@index([projectType])
+
+  // New optimization indexes
+  @@index([userId, updatedAt(sort: Desc)]) // For user project lists
+  @@index([visibility, likeCount(sort: Desc)]) // For popular public projects
+  @@index([visibility, forkCount(sort: Desc)]) // For most forked
+  @@index([visibility, viewCount(sort: Desc)]) // For trending
+  @@index([visibility, createdAt(sort: Desc)]) // For recent public projects
+  @@index([visibility, projectType, updatedAt(sort: Desc)]) // For filtered discovery
+  @@index([isFeatured, visibility, updatedAt(sort: Desc)]) // For featured projects
+  @@index([name]) // For name searches
+  @@index([userId, createdAt(sort: Desc)]) // For user project history
+}
+
+model ProjectFile {
+  id        String   @id @default(cuid())
+  projectId String
+  path      String   // e.g., "src/index.html", "src/styles/main.css"
+  content   String   @db.Text // Use TEXT for large files
+  language  String   // e.g., "html", "css", "javascript", "typescript"
+  size      Int      @default(0) // File size in bytes for optimization
+  checksum  String?  // For change detection
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, path])
+  @@index([projectId])
+  @@index([projectId, path]) // Composite index for file lookups
+  @@index([projectId, updatedAt(sort: Desc)]) // For getting latest files
+  @@index([language]) // For language-based filtering
+  @@index([projectId, language]) // For language-specific file queries
+}
+
+model Message {
+  id        String   @id @default(cuid())
+  role      String
+  content   String   @db.Text // Use TEXT for large messages
+  projectId String
+
+  // Additional fields for pagination
+  cursor    Int      @default(autoincrement()) // For cursor-based pagination
+  tokens    Int      @default(0) // Token count for this message
+
+  createdAt DateTime @default(now())
+
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId, createdAt])
+  @@index([projectId, cursor]) // For cursor-based pagination
+  @@index([projectId, createdAt(sort: Desc)]) // For latest messages
+  @@index([projectId, role, createdAt]) // For role-specific queries
+}
+
+model TokenUsage {
+  id           String   @id @default(cuid())
+  userId       String
+  tokensUsed   Int
+  contextUsed  Float
+  savedTokens  Int      @default(0)
+  endpoint     String
+
+  // Additional fields for analytics
+  projectId    String?  // Link to project if applicable
+  model        String?  // AI model used
+  cost         Float    @default(0) // Cost calculation
+
+  timestamp    DateTime @default(now())
+
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, timestamp])
+  @@index([endpoint])
+  @@index([userId, timestamp(sort: Desc)]) // For recent usage
+  @@index([userId, endpoint, timestamp(sort: Desc)]) // For endpoint-specific analytics
+  @@index([projectId]) // For project-based analytics
+  @@index([timestamp]) // For time-based aggregations
+  @@index([model]) // For model usage analytics
+}
+
+model ProjectCollaborator {
+  id        String   @id @default(cuid())
+  projectId String
+  userId    String
+  role      String   @default("VIEWER")
+  createdAt DateTime @default(now())
+
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, userId])
+  @@index([userId]) // For user's collaborations
+  @@index([projectId, role]) // For role-based queries
+}
+
+model CollaborationInvite {
+  id         String   @id @default(cuid())
+  projectId  String
+  fromUserId String
+  toUserId   String
+  status     String   @default("PENDING")
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  project    Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  fromUser   User     @relation("SentInvites", fields: [fromUserId], references: [id], onDelete: Cascade)
+  toUser     User     @relation("ReceivedInvites", fields: [toUserId], references: [id], onDelete: Cascade)
+
+  @@index([toUserId, status]) // For pending invites
+  @@index([fromUserId]) // For sent invites
+  @@index([projectId]) // For project invites
+  @@index([status, createdAt]) // For invitation management
+}
+
+// Additional model for competition features (referenced in discover route)
+model Competition {
+  id        String   @id @default(cuid())
+  projectId String   @unique
+  title     String
+  status    String   @default("ACTIVE")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([status])
+}

@@ -1,0 +1,374 @@
+name: Desktop Release
+
+on:
+  push:
+    tags:
+      - 'desktop-v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version (e.g., 1.0.1)'
+        required: true
+      release_notes:
+        description: 'Release notes'
+        required: true
+        default: 'Bug fixes and improvements'
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  create-release:
+    name: Create Release
+    runs-on: ubuntu-latest
+    outputs:
+      upload_url: ${{ steps.create_release.outputs.upload_url }}
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Extract version
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "version=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
+          else
+            echo "version=${GITHUB_REF#refs/tags/desktop-v}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: desktop-v${{ steps.version.outputs.version }}
+          release_name: Vibing2 Desktop v${{ steps.version.outputs.version }}
+          body: ${{ github.event.inputs.release_notes || 'New release' }}
+          draft: false
+          prerelease: false
+
+  build-macos:
+    name: Build macOS
+    needs: create-release
+    runs-on: macos-latest
+    strategy:
+      matrix:
+        arch: [x86_64, aarch64]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 8
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.arch }}-apple-darwin
+
+      - name: Install dependencies
+        run: pnpm install
+
+      - name: Build frontend
+        run: |
+          cd vibing2-desktop
+          pnpm run build:frontend
+
+      - name: Install Tauri CLI
+        run: cargo install tauri-cli
+
+      - name: Build Tauri app
+        run: |
+          cd vibing2-desktop
+          cargo tauri build --target ${{ matrix.arch }}-apple-darwin
+        env:
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+
+      - name: Generate signing key
+        run: |
+          cd vibing2-desktop
+          mkdir -p ~/.tauri
+          echo "${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}" > ~/.tauri/vibing2.key
+
+      - name: Sign bundles
+        run: |
+          cd vibing2-desktop
+          ./scripts/sign-update.sh --all src-tauri/target/${{ matrix.arch }}-apple-darwin/release/bundle
+
+      - name: Upload DMG
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ needs.create-release.outputs.upload_url }}
+          asset_path: vibing2-desktop/src-tauri/target/${{ matrix.arch }}-apple-darwin/release/bundle/dmg/Vibing2_${{ needs.create-release.outputs.version }}_${{ matrix.arch }}.dmg
+          asset_name: Vibing2_${{ needs.create-release.outputs.version }}_${{ matrix.arch }}.dmg
+          asset_content_type: application/octet-stream
+
+      - name: Upload DMG signature
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ needs.create-release.outputs.upload_url }}
+          asset_path: vibing2-desktop/src-tauri/target/${{ matrix.arch }}-apple-darwin/release/bundle/dmg/Vibing2_${{ needs.create-release.outputs.version }}_${{ matrix.arch }}.dmg.sig
+          asset_name: Vibing2_${{ needs.create-release.outputs.version }}_${{ matrix.arch }}.dmg.sig
+          asset_content_type: text/plain
+
+  build-windows:
+    name: Build Windows
+    needs: create-release
+    runs-on: windows-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 8
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install dependencies
+        run: pnpm install
+
+      - name: Build frontend
+        run: |
+          cd vibing2-desktop
+          pnpm run build:frontend
+
+      - name: Install Tauri CLI
+        run: cargo install tauri-cli
+
+      - name: Build Tauri app
+        run: |
+          cd vibing2-desktop
+          cargo tauri build
+        env:
+          WINDOWS_CERTIFICATE: ${{ secrets.WINDOWS_CERTIFICATE }}
+          WINDOWS_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
+
+      - name: Generate signing key
+        shell: bash
+        run: |
+          cd vibing2-desktop
+          mkdir -p ~/.tauri
+          echo "${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}" > ~/.tauri/vibing2.key
+
+      - name: Sign bundles
+        shell: bash
+        run: |
+          cd vibing2-desktop
+          ./scripts/sign-update.sh --all src-tauri/target/release/bundle
+
+      - name: Upload NSIS installer
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ needs.create-release.outputs.upload_url }}
+          asset_path: vibing2-desktop/src-tauri/target/release/bundle/nsis/Vibing2_${{ needs.create-release.outputs.version }}_x64-setup.exe
+          asset_name: Vibing2_${{ needs.create-release.outputs.version }}_x64-setup.exe
+          asset_content_type: application/octet-stream
+
+      - name: Upload NSIS signature
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ needs.create-release.outputs.upload_url }}
+          asset_path: vibing2-desktop/src-tauri/target/release/bundle/nsis/Vibing2_${{ needs.create-release.outputs.version }}_x64-setup.exe.sig
+          asset_name: Vibing2_${{ needs.create-release.outputs.version }}_x64-setup.exe.sig
+          asset_content_type: text/plain
+
+      - name: Upload MSI installer
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ needs.create-release.outputs.upload_url }}
+          asset_path: vibing2-desktop/src-tauri/target/release/bundle/msi/Vibing2_${{ needs.create-release.outputs.version }}_x64_en-US.msi
+          asset_name: Vibing2_${{ needs.create-release.outputs.version }}_x64.msi
+          asset_content_type: application/octet-stream
+
+      - name: Upload MSI signature
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ needs.create-release.outputs.upload_url }}
+          asset_path: vibing2-desktop/src-tauri/target/release/bundle/msi/Vibing2_${{ needs.create-release.outputs.version }}_x64_en-US.msi.sig
+          asset_name: Vibing2_${{ needs.create-release.outputs.version }}_x64.msi.sig
+          asset_content_type: text/plain
+
+  build-linux:
+    name: Build Linux
+    needs: create-release
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        arch: [x86_64]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 8
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libgtk-3-dev \
+            libwebkit2gtk-4.0-dev \
+            libappindicator3-dev \
+            librsvg2-dev \
+            patchelf
+
+      - name: Install dependencies
+        run: pnpm install
+
+      - name: Build frontend
+        run: |
+          cd vibing2-desktop
+          pnpm run build:frontend
+
+      - name: Install Tauri CLI
+        run: cargo install tauri-cli
+
+      - name: Build Tauri app
+        run: |
+          cd vibing2-desktop
+          cargo tauri build
+
+      - name: Generate signing key
+        run: |
+          cd vibing2-desktop
+          mkdir -p ~/.tauri
+          echo "${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}" > ~/.tauri/vibing2.key
+
+      - name: Sign bundles
+        run: |
+          cd vibing2-desktop
+          ./scripts/sign-update.sh --all src-tauri/target/release/bundle
+
+      - name: Upload AppImage
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ needs.create-release.outputs.upload_url }}
+          asset_path: vibing2-desktop/src-tauri/target/release/bundle/appimage/vibing2_${{ needs.create-release.outputs.version }}_amd64.AppImage
+          asset_name: Vibing2_${{ needs.create-release.outputs.version }}_amd64.AppImage
+          asset_content_type: application/octet-stream
+
+      - name: Upload AppImage signature
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ needs.create-release.outputs.upload_url }}
+          asset_path: vibing2-desktop/src-tauri/target/release/bundle/appimage/vibing2_${{ needs.create-release.outputs.version }}_amd64.AppImage.sig
+          asset_name: Vibing2_${{ needs.create-release.outputs.version }}_amd64.AppImage.sig
+          asset_content_type: text/plain
+
+      - name: Upload DEB package
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ needs.create-release.outputs.upload_url }}
+          asset_path: vibing2-desktop/src-tauri/target/release/bundle/deb/vibing2_${{ needs.create-release.outputs.version }}_amd64.deb
+          asset_name: Vibing2_${{ needs.create-release.outputs.version }}_amd64.deb
+          asset_content_type: application/octet-stream
+
+  generate-manifest:
+    name: Generate Update Manifest
+    needs: [create-release, build-macos, build-windows, build-linux]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Download release assets
+        uses: actions/download-artifact@v3
+        with:
+          path: ./downloads
+
+      - name: Generate manifest
+        run: |
+          cd vibing2-desktop
+          node scripts/generate-update-manifest.js \
+            ${{ needs.create-release.outputs.version }} \
+            "${{ github.event.inputs.release_notes || 'New release' }}" \
+            --github
+
+      - name: Upload manifest
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ needs.create-release.outputs.upload_url }}
+          asset_path: vibing2-desktop/releases/${{ needs.create-release.outputs.version }}.json
+          asset_name: update-manifest.json
+          asset_content_type: application/json
+
+      - name: Update latest manifest
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ needs.create-release.outputs.upload_url }}
+          asset_path: vibing2-desktop/releases/latest.json
+          asset_name: latest.json
+          asset_content_type: application/json
+
+  notify:
+    name: Post-release Notifications
+    needs: [generate-manifest]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Send notification
+        run: |
+          echo "Release completed successfully!"
+          echo "Version: ${{ needs.create-release.outputs.version }}"

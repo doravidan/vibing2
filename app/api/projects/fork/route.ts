@@ -27,19 +27,10 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    // Record fork relationship
-    await prisma.projectFork.create({
-      data: {
-        originalId: projectId,
-        forkId: fork.id,
-        userId,
-      },
-    });
-
-    // Increment fork count
+    // Increment fork count (no ProjectFork table, just track count)
     await prisma.project.update({
       where: { id: projectId },
-      data: { forkCount: { increment: 1 } },
+      data: { forks: { increment: 1 } },
     });
 
     return NextResponse.json({

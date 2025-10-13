@@ -1,0 +1,348 @@
+name: Release Desktop App
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release (e.g., 1.0.0)'
+        required: true
+        type: string
+
+env:
+  NODE_VERSION: '20'
+  PNPM_VERSION: '9.7.0'
+  RUST_VERSION: 'stable'
+
+jobs:
+  create-release:
+    name: Create Release
+    runs-on: ubuntu-latest
+    outputs:
+      release_id: ${{ steps.create-release.outputs.id }}
+      upload_url: ${{ steps.create-release.outputs.upload_url }}
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Get version
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            VERSION="${{ inputs.version }}"
+          else
+            VERSION=${GITHUB_REF#refs/tags/v}
+          fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Version: $VERSION"
+
+      - name: Extract changelog
+        id: changelog
+        run: |
+          VERSION=${{ steps.version.outputs.version }}
+
+          # Extract changelog for this version
+          if [ -f "CHANGELOG.md" ]; then
+            # Get content between this version and next version header
+            NOTES=$(sed -n "/## \[$VERSION\]/,/## \[/p" CHANGELOG.md | sed '$d' | tail -n +2)
+
+            if [ -z "$NOTES" ]; then
+              NOTES="Release $VERSION"
+            fi
+          else
+            NOTES="Release $VERSION"
+          fi
+
+          # Write to file for multiline handling
+          echo "$NOTES" > release-notes.txt
+          echo "notes-file=release-notes.txt" >> $GITHUB_OUTPUT
+
+      - name: Create Release
+        id: create-release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: v${{ steps.version.outputs.version }}
+          release_name: Vibing2 v${{ steps.version.outputs.version }}
+          body_path: release-notes.txt
+          draft: true
+          prerelease: false
+
+  build-macos:
+    name: Build macOS
+    needs: create-release
+    runs-on: macos-latest
+    strategy:
+      matrix:
+        target:
+          - x86_64-apple-darwin
+          - aarch64-apple-darwin
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v3
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: Setup Rust
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: ${{ env.RUST_VERSION }}
+          target: ${{ matrix.target }}
+
+      - name: Install Tauri CLI
+        run: cargo install tauri-cli --version '^2.0.0'
+
+      - name: Get pnpm store directory
+        id: pnpm-cache
+        run: echo "STORE_PATH=$(pnpm store path)" >> $GITHUB_OUTPUT
+
+      - name: Setup pnpm cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ steps.pnpm-cache.outputs.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
+
+      - name: Setup Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: vibing2-desktop/src-tauri
+          cache-targets: true
+          cache-on-failure: true
+
+      - name: Install dependencies
+        run: |
+          pnpm install --frozen-lockfile
+          cd vibing2-desktop
+          pnpm install --frozen-lockfile
+
+      - name: Build Next.js app
+        run: BUILD_MODE=desktop pnpm run build
+
+      - name: Copy Next.js assets
+        run: node vibing2-desktop/scripts/copy-assets.js
+
+      - name: Build Tauri app
+        run: |
+          cd vibing2-desktop
+          cargo tauri build --target ${{ matrix.target }}
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+
+      - name: Sign and notarize (macOS)
+        if: runner.os == 'macOS' && matrix.target == 'x86_64-apple-darwin'
+        env:
+          APPLE_DEVELOPER_IDENTITY: ${{ secrets.APPLE_DEVELOPER_IDENTITY }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
+        run: |
+          # Import certificate
+          echo "${{ secrets.APPLE_CERTIFICATE }}" | base64 --decode > certificate.p12
+          security create-keychain -p "${{ secrets.KEYCHAIN_PASSWORD }}" build.keychain
+          security default-keychain -s build.keychain
+          security unlock-keychain -p "${{ secrets.KEYCHAIN_PASSWORD }}" build.keychain
+          security import certificate.p12 -k build.keychain -P "${{ secrets.CERTIFICATE_PASSWORD }}" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "${{ secrets.KEYCHAIN_PASSWORD }}" build.keychain
+
+          # Create .env.production for signing script
+          cat > vibing2-desktop/.env.production << EOF
+          APPLE_DEVELOPER_IDENTITY="${{ secrets.APPLE_DEVELOPER_IDENTITY }}"
+          APPLE_ID="${{ secrets.APPLE_ID }}"
+          APPLE_TEAM_ID="${{ secrets.APPLE_TEAM_ID }}"
+          APPLE_APP_PASSWORD="${{ secrets.APPLE_APP_PASSWORD }}"
+          EOF
+
+          # Copy build artifacts to dist
+          mkdir -p vibing2-desktop/dist
+          cp -R vibing2-desktop/src-tauri/target/${{ matrix.target }}/release/bundle/macos/Vibing2.app vibing2-desktop/dist/
+          cp vibing2-desktop/src-tauri/target/${{ matrix.target }}/release/bundle/dmg/Vibing2-*.dmg vibing2-desktop/dist/Vibing2-macos.dmg
+
+          # Run signing script
+          cd vibing2-desktop
+          ./scripts/sign-and-notarize.sh
+
+      - name: Generate checksums
+        run: |
+          cd vibing2-desktop/src-tauri/target/${{ matrix.target }}/release/bundle/dmg
+          shasum -a 256 *.dmg > checksums.txt
+
+      - name: Upload DMG to release
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ needs.create-release.outputs.upload_url }}
+          asset_path: vibing2-desktop/src-tauri/target/${{ matrix.target }}/release/bundle/dmg/Vibing2-macos.dmg
+          asset_name: Vibing2-${{ matrix.target }}-${{ needs.create-release.outputs.version }}.dmg
+          asset_content_type: application/x-apple-diskimage
+
+      - name: Upload checksums
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ needs.create-release.outputs.upload_url }}
+          asset_path: vibing2-desktop/src-tauri/target/${{ matrix.target }}/release/bundle/dmg/checksums.txt
+          asset_name: Vibing2-${{ matrix.target }}-${{ needs.create-release.outputs.version }}.dmg.sha256
+          asset_content_type: text/plain
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-${{ matrix.target }}-${{ needs.create-release.outputs.version }}
+          path: |
+            vibing2-desktop/src-tauri/target/${{ matrix.target }}/release/bundle/dmg/*.dmg
+            vibing2-desktop/src-tauri/target/${{ matrix.target }}/release/bundle/dmg/checksums.txt
+          retention-days: 30
+
+  create-universal-binary:
+    name: Create Universal macOS Binary
+    needs: [create-release, build-macos]
+    runs-on: macos-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download Intel build
+        uses: actions/download-artifact@v4
+        with:
+          name: macos-x86_64-apple-darwin-${{ needs.create-release.outputs.version }}
+          path: intel
+
+      - name: Download Apple Silicon build
+        uses: actions/download-artifact@v4
+        with:
+          name: macos-aarch64-apple-darwin-${{ needs.create-release.outputs.version }}
+          path: apple-silicon
+
+      - name: Create universal binary
+        run: |
+          # Extract DMG contents
+          hdiutil attach intel/*.dmg -mountpoint /Volumes/Intel
+          hdiutil attach apple-silicon/*.dmg -mountpoint /Volumes/AppleSilicon
+
+          # Copy apps
+          cp -R /Volumes/Intel/Vibing2.app intel/
+          cp -R /Volumes/AppleSilicon/Vibing2.app apple-silicon/
+
+          # Detach DMGs
+          hdiutil detach /Volumes/Intel
+          hdiutil detach /Volumes/AppleSilicon
+
+          # Create universal binary
+          mkdir -p universal/Vibing2.app/Contents/MacOS
+          lipo -create \
+            intel/Vibing2.app/Contents/MacOS/Vibing2 \
+            apple-silicon/Vibing2.app/Contents/MacOS/Vibing2 \
+            -output universal/Vibing2.app/Contents/MacOS/Vibing2
+
+          # Copy other resources (use Intel version as base)
+          cp -R intel/Vibing2.app/Contents/* universal/Vibing2.app/Contents/
+          cp universal/Vibing2.app/Contents/MacOS/Vibing2 universal/Vibing2.app/Contents/MacOS/Vibing2
+
+          # Create universal DMG
+          ln -s /Applications universal/Applications
+          hdiutil create -volname "Vibing2" -srcfolder universal -ov -format UDZO Vibing2-universal-${{ needs.create-release.outputs.version }}.dmg
+
+      - name: Upload universal DMG
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ needs.create-release.outputs.upload_url }}
+          asset_path: Vibing2-universal-${{ needs.create-release.outputs.version }}.dmg
+          asset_name: Vibing2-universal-${{ needs.create-release.outputs.version }}.dmg
+          asset_content_type: application/x-apple-diskimage
+
+  generate-update-manifest:
+    name: Generate Update Manifest
+    needs: [create-release, build-macos, create-universal-binary]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+
+      - name: Generate update manifest
+        run: |
+          VERSION=${{ needs.create-release.outputs.version }}
+
+          cat > latest.json << EOF
+          {
+            "version": "$VERSION",
+            "date": "$(date -u +"%Y-%m-%dT%H:%M:%SZ")",
+            "platforms": {
+              "darwin-x86_64": {
+                "url": "https://github.com/${{ github.repository }}/releases/download/v$VERSION/Vibing2-x86_64-apple-darwin-$VERSION.dmg",
+                "signature": "",
+                "size": $(stat -f%z macos-x86_64-apple-darwin-$VERSION/*.dmg 2>/dev/null || echo 0)
+              },
+              "darwin-aarch64": {
+                "url": "https://github.com/${{ github.repository }}/releases/download/v$VERSION/Vibing2-aarch64-apple-darwin-$VERSION.dmg",
+                "signature": "",
+                "size": $(stat -f%z macos-aarch64-apple-darwin-$VERSION/*.dmg 2>/dev/null || echo 0)
+              },
+              "darwin-universal": {
+                "url": "https://github.com/${{ github.repository }}/releases/download/v$VERSION/Vibing2-universal-$VERSION.dmg",
+                "signature": "",
+                "size": 0
+              }
+            },
+            "notes": "See release notes at https://github.com/${{ github.repository }}/releases/tag/v$VERSION"
+          }
+          EOF
+
+      - name: Upload update manifest
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ needs.create-release.outputs.upload_url }}
+          asset_path: latest.json
+          asset_name: latest.json
+          asset_content_type: application/json
+
+  publish-release:
+    name: Publish Release
+    needs: [create-release, build-macos, create-universal-binary, generate-update-manifest]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Publish release
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            await github.rest.repos.updateRelease({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              release_id: ${{ needs.create-release.outputs.release_id }},
+              draft: false
+            });
+
+      - name: Trigger website update
+        if: success()
+        run: |
+          curl -X POST \
+            -H "Authorization: Bearer ${{ secrets.DEPLOY_WEBHOOK_TOKEN }}" \
+            -H "Content-Type: application/json" \
+            -d '{"version": "${{ needs.create-release.outputs.version }}"}' \
+            ${{ secrets.DEPLOY_WEBHOOK_URL }} || true

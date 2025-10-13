@@ -1,30 +1,29 @@
 import { NextRequest, NextResponse } from 'next/server';
-import prisma from '@/lib/db';
+import { auth } from '@/auth';
+import { prisma } from '@/lib/prisma';
 
 export async function GET(req: NextRequest) {
   try {
-    const { searchParams } = new URL(req.url);
-    const userId = searchParams.get('userId');
+    const session = await auth();
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
 
-    const projects = userId
-      ? await prisma.project.findMany({
-          where: { userId },
-          orderBy: { updatedAt: 'desc' },
-          include: {
-            _count: {
-              select: { messages: true },
-            },
-          },
-        })
-      : await prisma.project.findMany({
-          orderBy: { updatedAt: 'desc' },
-          take: 20,
-          include: {
-            _count: {
-              select: { messages: true },
-            },
-          },
-        });
+    // Query projects for the current user with message counts
+    const projects = await prisma.project.findMany({
+      where: {
+        userId: session.user.id,
+      },
+      include: {
+        _count: {
+          select: { messages: true }
+        }
+      },
+      orderBy: {
+        updatedAt: 'desc'
+      },
+      take: 20
+    });
 
     return NextResponse.json({
       success: true,
@@ -33,10 +32,10 @@ export async function GET(req: NextRequest) {
         name: p.name,
         description: p.description,
         projectType: p.projectType,
-        activeAgents: JSON.parse(p.activeAgents),
+        activeAgents: p.activeAgents ? JSON.parse(p.activeAgents) : [],
         messageCount: p._count.messages,
-        createdAt: p.createdAt,
-        updatedAt: p.updatedAt,
+        createdAt: p.createdAt.toISOString(),
+        updatedAt: p.updatedAt.toISOString(),
       })),
     });
   } catch (error: any) {

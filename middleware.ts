@@ -5,6 +5,21 @@ export default auth((req) => {
   const { nextUrl } = req;
   const isLoggedIn = !!req.auth;
 
+  // Disable auth for tests if DISABLE_AUTH env var is set
+  if (process.env.DISABLE_AUTH === 'true') {
+    return NextResponse.next();
+  }
+
+  // Detect Tauri desktop app by checking User-Agent header
+  const userAgent = req.headers.get('user-agent') || '';
+  const isTauriApp = userAgent.includes('Tauri') || req.headers.get('x-tauri-app') === 'true';
+
+  // Skip authentication for Tauri desktop app
+  // Desktop app uses local SQLite and integrates with Claude Code subscription
+  if (isTauriApp) {
+    return NextResponse.next();
+  }
+
   const isAuthPage = nextUrl.pathname.startsWith('/auth');
   const isProtectedPage =
     nextUrl.pathname.startsWith('/create') ||

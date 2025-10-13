@@ -1,0 +1,66 @@
+[package]
+name = "vibing2-desktop"
+version = "1.0.0"
+description = "Vibing2 Desktop - AI Development Platform"
+authors = ["Vibing2"]
+license = "MIT"
+repository = "https://github.com/vibing2/vibing2"
+edition = "2021"
+
+[lib]
+name = "vibing2_desktop"
+path = "src/lib.rs"
+
+[[bin]]
+name = "vibing2-desktop"
+path = "src/main.rs"
+
+[build-dependencies]
+tauri-build = { version = "2.0", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = ["devtools", "tray-icon"] }
+tauri-plugin-shell = "2"
+tauri-plugin-dialog = "2"
+tauri-plugin-fs = "2"
+tauri-plugin-updater = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tokio = { version = "1", features = ["full"] }
+sqlx = { version = "0.7", features = ["runtime-tokio-rustls", "sqlite"] }
+chrono = { version = "0.4", features = ["serde"] }
+dirs = "5"
+uuid = { version = "1", features = ["v4", "serde"] }
+thiserror = "1"
+rand = "0.8"
+keyring = "3"
+reqwest = { version = "0.12", features = ["json"] }
+
+# HTTP Server dependencies
+axum = { version = "0.7", features = ["ws", "macros"] }
+tower = { version = "0.4", features = ["full"] }
+tower-http = { version = "0.5", features = ["fs", "cors", "trace", "compression-gzip"] }
+hyper = { version = "1", features = ["full"] }
+futures = "0.3"
+async-stream = "0.3"
+tokio-stream = { version = "0.1", features = ["net"] }
+
+# Logging
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
+
+[dev-dependencies]
+tempfile = "3"
+tokio-test = "0.4"
+serial_test = "3"
+
+[features]
+default = ["custom-protocol"]
+custom-protocol = ["tauri/custom-protocol"]
+
+[profile.release]
+panic = "abort"
+codegen-units = 1
+lto = true
+opt-level = "s"
+strip = true

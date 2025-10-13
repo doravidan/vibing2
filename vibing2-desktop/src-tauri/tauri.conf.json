@@ -1,0 +1,79 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Vibing2",
+  "version": "1.0.0",
+  "identifier": "com.vibing2.desktop",
+  "build": {
+    "beforeDevCommand": "pnpm run dev:vite",
+    "beforeBuildCommand": "pnpm run build:frontend",
+    "devUrl": "http://localhost:5173",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "Vibing2",
+        "width": 1400,
+        "height": 900,
+        "minWidth": 1200,
+        "minHeight": 700,
+        "resizable": true,
+        "fullscreen": false,
+        "center": true,
+        "hiddenTitle": false,
+        "skipTaskbar": false
+      }
+    ],
+    "trayIcon": {
+      "id": "main",
+      "iconPath": "icons/icon.png",
+      "iconAsTemplate": true,
+      "menuOnLeftClick": true,
+      "title": "Vibing2",
+      "tooltip": "Vibing2 - AI Development Platform"
+    },
+    "withGlobalTauri": true,
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["dmg", "app"],
+    "icon": [
+      "icons/icon_32x32.png",
+      "icons/icon_128x128.png",
+      "icons/icon_256x256.png",
+      "icons/icon.png",
+      "icons/icon.icns"
+    ],
+    "publisher": "Vibing2",
+    "copyright": "Copyright © 2025 Vibing2. All rights reserved.",
+    "category": "DeveloperTool",
+    "shortDescription": "AI-Powered Development Platform",
+    "longDescription": "Build web applications with AI assistance. 154 specialized agents, 70% cost savings, and 100% local data storage.",
+    "macOS": {
+      "minimumSystemVersion": "11.0",
+      "dmg": {
+        "appPosition": {
+          "x": 160,
+          "y": 280
+        },
+        "applicationFolderPosition": {
+          "x": 500,
+          "y": 280
+        }
+      }
+    }
+  },
+  "plugins": {
+    "updater": {
+      "active": true,
+      "endpoints": [
+        "https://releases.vibing2.com/{{target}}/{{arch}}/{{current_version}}"
+      ],
+      "dialog": true,
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDQ4MzM4NzVGQzc0NzI1RTcKUldRNWVBcG9QQ2o0eXpNb2VYQ2RsV3BRenRYdWFMYUlCZTdWQktPdHZUMTZRRVNLZzFqVkpWNjQK"
+    }
+  }
+}

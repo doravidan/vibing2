@@ -23,9 +23,10 @@ export async function GET(req: NextRequest) {
       where.projectType = category.toUpperCase().replace('-', '_');
     }
 
-    if (featured) {
-      where.isFeatured = true;
-    }
+    // Note: isFeatured field doesn't exist in schema, skip featured filtering for now
+    // if (featured) {
+    //   where.isFeatured = true;
+    // }
 
     if (search) {
       where.OR = [
@@ -38,13 +39,13 @@ export async function GET(req: NextRequest) {
     let orderBy: any = {};
     switch (sort) {
       case 'popular':
-        orderBy = { likeCount: 'desc' };
+        orderBy = { likes: 'desc' };
         break;
       case 'trending':
-        orderBy = { viewCount: 'desc' };
+        orderBy = { updatedAt: 'desc' }; // Use updatedAt as proxy for trending
         break;
       case 'forks':
-        orderBy = { forkCount: 'desc' };
+        orderBy = { forks: 'desc' };
         break;
       default:
         orderBy = { createdAt: 'desc' };
@@ -64,17 +65,10 @@ export async function GET(req: NextRequest) {
               email: true,
             },
           },
-          competition: {
-            select: {
-              id: true,
-              title: true,
-              status: true,
-            },
-          },
           _count: {
             select: {
-              likes: true,
-              ratings: true,
+              messages: true,
+              files: true,
             },
           },
         },
@@ -95,16 +89,16 @@ export async function GET(req: NextRequest) {
           email: p.user.email,
         },
         stats: {
-          views: p.viewCount,
-          likes: p.likeCount,
-          forks: p.forkCount,
+          views: 0, // viewCount not in schema
+          likes: p.likes,
+          forks: p.forks,
+          messages: p._count.messages,
+          files: p._count.files,
         },
         preview: {
-          code: p.currentCode.substring(0, 500), // First 500 chars for thumbnail
-          url: p.previewUrl,
+          code: p.currentCode?.substring(0, 500) || '', // First 500 chars for thumbnail
+          url: null, // previewUrl not in schema
         },
-        competition: p.competition,
-        isFeatured: p.isFeatured,
         createdAt: p.createdAt,
         updatedAt: p.updatedAt,
       })),

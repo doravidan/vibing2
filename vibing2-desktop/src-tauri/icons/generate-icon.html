@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Vibing2 Icon Generator</title>
+  <style>
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 20px;
+      background: #1a1a1a;
+      color: #fff;
+    }
+    h1 {
+      background: linear-gradient(135deg, #8B5CF6, #EC4899);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .icon-preview {
+      display: flex;
+      gap: 20px;
+      flex-wrap: wrap;
+      margin: 20px 0;
+    }
+    .preview-item {
+      text-align: center;
+    }
+    canvas {
+      border: 1px solid #333;
+      border-radius: 8px;
+      image-rendering: -webkit-optimize-contrast;
+    }
+    button {
+      background: linear-gradient(135deg, #8B5CF6, #EC4899);
+      color: white;
+      border: none;
+      padding: 12px 24px;
+      border-radius: 8px;
+      font-size: 16px;
+      cursor: pointer;
+      margin: 10px 5px;
+    }
+    button:hover {
+      opacity: 0.9;
+    }
+    .instructions {
+      background: #2a2a2a;
+      padding: 20px;
+      border-radius: 8px;
+      margin: 20px 0;
+    }
+    code {
+      background: #1a1a1a;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-family: 'Monaco', 'Courier New', monospace;
+    }
+    pre {
+      background: #1a1a1a;
+      padding: 15px;
+      border-radius: 8px;
+      overflow-x: auto;
+    }
+  </style>
+</head>
+<body>
+  <h1>Vibing2 Icon Generator</h1>
+
+  <div class="instructions">
+    <h2>Design Concept</h2>
+    <p><strong>Visual Identity:</strong></p>
+    <ul>
+      <li><strong>Symbol:</strong> Stylized "V2" representing Vibing2</li>
+      <li><strong>Wave motif:</strong> Three curved lines suggesting vibration, energy, and AI activity</li>
+      <li><strong>Sparks:</strong> Small dots representing AI intelligence and innovation</li>
+      <li><strong>Gradient:</strong> Purple to pink (from-purple-500 #8B5CF6 to-pink-500 #EC4899)</li>
+      <li><strong>Style:</strong> Modern, clean, tech-focused with subtle glow effects</li>
+    </ul>
+    <p><strong>Why this design works:</strong></p>
+    <ul>
+      <li>Recognizable at all sizes (16x16 to 512x512)</li>
+      <li>Memorable brand identity with the V2 mark</li>
+      <li>Conveys both technology (sharp edges) and friendliness (rounded corners, waves)</li>
+      <li>Professional appearance suitable for developer tools</li>
+    </ul>
+  </div>
+
+  <h2>Icon Previews</h2>
+  <div class="icon-preview">
+    <div class="preview-item">
+      <canvas id="icon-1024" width="1024" height="1024"></canvas>
+      <p>1024x1024 (Master)</p>
+      <button onclick="downloadIcon('icon-1024', 1024)">Download PNG</button>
+    </div>
+    <div class="preview-item">
+      <canvas id="icon-512" width="512" height="512"></canvas>
+      <p>512x512</p>
+      <button onclick="downloadIcon('icon-512', 512)">Download PNG</button>
+    </div>
+    <div class="preview-item">
+      <canvas id="icon-256" width="256" height="256"></canvas>
+      <p>256x256 (@2x)</p>
+      <button onclick="downloadIcon('icon-256', 256)">Download PNG</button>
+    </div>
+    <div class="preview-item">
+      <canvas id="icon-128" width="128" height="128"></canvas>
+      <p>128x128</p>
+      <button onclick="downloadIcon('icon-128', 128)">Download PNG</button>
+    </div>
+    <div class="preview-item">
+      <canvas id="icon-32" width="32" height="32"></canvas>
+      <p>32x32</p>
+      <button onclick="downloadIcon('icon-32', 32)">Download PNG</button>
+    </div>
+    <div class="preview-item">
+      <canvas id="icon-16" width="16" height="16"></canvas>
+      <p>16x16</p>
+      <button onclick="downloadIcon('icon-16', 16)">Download PNG</button>
+    </div>
+  </div>
+
+  <button onclick="downloadAllIcons()" style="font-size: 18px; padding: 15px 30px;">
+    Download All Icons
+  </button>
+
+  <div class="instructions">
+    <h2>How to Use These Icons</h2>
+
+    <h3>Step 1: Generate Icons</h3>
+    <p>Click "Download All Icons" above to get all required sizes.</p>
+
+    <h3>Step 2: Use Tauri Icon Command</h3>
+    <p>Save the 1024x1024 master icon as <code>icon.png</code>, then run:</p>
+    <pre>cd vibing2-desktop
+pnpm tauri icon src-tauri/icons/icon.png</pre>
+    <p>This will automatically generate all platform-specific icons:</p>
+    <ul>
+      <li><code>32x32.png</code> - Small icon</li>
+      <li><code>128x128.png</code> - Standard icon</li>
+      <li><code>128x128@2x.png</code> - Retina icon (256x256)</li>
+      <li><code>icon.icns</code> - macOS bundle icon</li>
+      <li><code>icon.ico</code> - Windows icon</li>
+    </ul>
+
+    <h3>Step 3: macOS App Store Requirements</h3>
+    <p>For App Store submission, you need:</p>
+    <ul>
+      <li><strong>Icon sizes:</strong> 16x16, 32x32, 64x64, 128x128, 256x256, 512x512, 1024x1024 (all @1x and @2x)</li>
+      <li><strong>Format:</strong> PNG with transparency or ICNS bundle</li>
+      <li><strong>Design:</strong> No transparency in corners (use rounded rect background)</li>
+      <li><strong>Safe area:</strong> Keep important elements within 90% of canvas</li>
+      <li><strong>Consistency:</strong> Icon should look good on light and dark backgrounds</li>
+    </ul>
+
+    <h3>macOS Bundle Configuration</h3>
+    <p>The icon is already configured in <code>tauri.conf.json</code>:</p>
+    <pre>"bundle": {
+  "icon": ["icons/icon.png"],
+  "category": "DeveloperTool"
+}</pre>
+
+    <h3>Professional Icon Design Tips</h3>
+    <ul>
+      <li><strong>Simplicity:</strong> Icons should be simple and recognizable at 16x16</li>
+      <li><strong>Contrast:</strong> Ensure good contrast for accessibility</li>
+      <li><strong>Consistency:</strong> Match your brand colors and style</li>
+      <li><strong>Testing:</strong> Test icon at all sizes and on different backgrounds</li>
+      <li><strong>Platform guidelines:</strong> Follow Apple Human Interface Guidelines for macOS</li>
+      <li><strong>File size:</strong> Optimize PNGs (use tools like pngquant or ImageOptim)</li>
+    </ul>
+
+    <h3>Alternative: Professional Design Tools</h3>
+    <p>For production apps, consider using:</p>
+    <ul>
+      <li><strong>Figma:</strong> Design icon with components, export at all sizes</li>
+      <li><strong>Sketch:</strong> Native macOS app with icon templates</li>
+      <li><strong>Adobe Illustrator:</strong> Vector design with artboards for each size</li>
+      <li><strong>SF Symbols:</strong> For macOS-native look (requires macOS 11+)</li>
+    </ul>
+  </div>
+
+  <script>
+    // Draw icon at specified size
+    function drawIcon(canvas) {
+      const ctx = canvas.getContext('2d');
+      const size = canvas.width;
+      const scale = size / 1024;
+
+      // Clear canvas
+      ctx.clearRect(0, 0, size, size);
+
+      // Enable anti-aliasing
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = 'high';
+
+      // Create gradient background
+      const gradient = ctx.createLinearGradient(0, 0, size, size);
+      gradient.addColorStop(0, '#8B5CF6'); // purple-500
+      gradient.addColorStop(1, '#EC4899'); // pink-500
+
+      // Draw rounded rectangle background
+      const cornerRadius = 225 * scale;
+      ctx.fillStyle = gradient;
+      ctx.beginPath();
+      ctx.roundRect(0, 0, size, size, cornerRadius);
+      ctx.fill();
+
+      // Set up for drawing white elements
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.95)';
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.6)';
+
+      // Scale all coordinates
+      const s = (val) => val * scale;
+
+      // Draw "V" shape
+      ctx.beginPath();
+      ctx.moveTo(s(280), s(320));
+      ctx.lineTo(s(420), s(680));
+      ctx.lineTo(s(480), s(680));
+      ctx.lineTo(s(340), s(320));
+      ctx.closePath();
+      ctx.fill();
+
+      // Draw "2" shape (simplified for canvas)
+      ctx.beginPath();
+      // Top curve
+      ctx.arc(s(622), s(380), s(78), -Math.PI * 0.7, Math.PI * 0.2);
+      // Right side
+      ctx.lineTo(s(700), s(400));
+      ctx.lineTo(s(700), s(680));
+      ctx.lineTo(s(544), s(680));
+      ctx.lineTo(s(544), s(600));
+      ctx.lineTo(s(640), s(600));
+      ctx.lineTo(s(640), s(520));
+      // Left side back up
+      ctx.lineTo(s(544), s(520));
+      ctx.lineTo(s(544), s(320));
+      ctx.closePath();
+      ctx.fill();
+
+      // Draw wave lines (vibration effect) - only visible at larger sizes
+      if (size >= 64) {
+        ctx.lineWidth = s(16);
+        ctx.lineCap = 'round';
+
+        // Top wave
+        ctx.globalAlpha = 0.6;
+        ctx.beginPath();
+        ctx.moveTo(s(320), s(200));
+        ctx.quadraticCurveTo(s(380), s(180), s(440), s(200));
+        ctx.stroke();
+
+        // Middle wave
+        ctx.globalAlpha = 0.5;
+        ctx.beginPath();
+        ctx.moveTo(s(280), s(240));
+        ctx.quadraticCurveTo(s(340), s(220), s(400), s(240));
+        ctx.stroke();
+
+        // Bottom wave
+        ctx.globalAlpha = 0.4;
+        ctx.beginPath();
+        ctx.moveTo(s(240), s(280));
+        ctx.quadraticCurveTo(s(300), s(260), s(360), s(280));
+        ctx.stroke();
+
+        ctx.globalAlpha = 1.0;
+      }
+
+      // Draw sparkle dots - only visible at larger sizes
+      if (size >= 32) {
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+        ctx.beginPath();
+        ctx.arc(s(720), s(280), s(12), 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
+        ctx.beginPath();
+        ctx.arc(s(760), s(320), s(8), 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
+        ctx.beginPath();
+        ctx.arc(s(780), s(360), s(10), 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      // Draw bottom accent line - only visible at larger sizes
+      if (size >= 64) {
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
+        ctx.beginPath();
+        ctx.roundRect(s(240), s(740), s(544), s(12), s(6));
+        ctx.fill();
+      }
+    }
+
+    // Initialize all canvases
+    function initAllCanvases() {
+      ['1024', '512', '256', '128', '32', '16'].forEach(size => {
+        const canvas = document.getElementById(`icon-${size}`);
+        drawIcon(canvas);
+      });
+    }
+
+    // Download single icon
+    function downloadIcon(canvasId, size) {
+      const canvas = document.getElementById(canvasId);
+      const link = document.createElement('a');
+      link.download = `icon-${size}x${size}.png`;
+      link.href = canvas.toDataURL('image/png');
+      link.click();
+    }
+
+    // Download all icons
+    function downloadAllIcons() {
+      const sizes = [1024, 512, 256, 128, 32, 16];
+      sizes.forEach((size, index) => {
+        setTimeout(() => {
+          downloadIcon(`icon-${size}`, size);
+        }, index * 500); // Stagger downloads
+      });
+      alert('Downloading all icon sizes! Check your downloads folder.');
+    }
+
+    // Initialize on load
+    window.addEventListener('load', initAllCanvases);
+  </script>
+</body>
+</html>
