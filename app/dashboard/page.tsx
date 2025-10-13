@@ -1,6 +1,6 @@
 import { auth } from '@/auth';
 import { redirect } from 'next/navigation';
-import { prisma } from '@/lib/prisma';
+import { getUserById, getProjectsByUserId } from '@/lib/instantdb';
 import DashboardClient from './DashboardClient';
 
 export default async function DashboardPage() {
@@ -10,32 +10,22 @@ export default async function DashboardPage() {
     redirect('/auth/signin');
   }
 
-  const projects = await prisma.project.findMany({
-    where: { userId: session.user.id },
-    orderBy: { updatedAt: 'desc' },
-    include: {
-      _count: {
-        select: {
-          messages: true,
-        },
-      },
-    },
-  });
+  const [user, projects] = await Promise.all([
+    getUserById(session.user.id),
+    getProjectsByUserId(session.user.id)
+  ]);
 
-  const user = await prisma.user.findUnique({
-    where: { id: session.user.id },
-    select: {
-      name: true,
-      email: true,
-      plan: true,
-      tokenBalance: true,
-      _count: {
-        select: {
-          projects: true,
-        },
-      },
-    },
-  });
+  // Transform projects to match the expected format
+  const projectsWithCounts = projects.map((project: any) => ({
+    id: project.id,
+    name: project.name || 'Untitled Project',
+    description: project.description || '',
+    projectType: project.projectType || 'website',
+    messageCount: project.messages?.length || 0,
+    visibility: project.visibility || 'PRIVATE',
+    createdAt: project.createdAt ? new Date(project.createdAt).toISOString() : new Date().toISOString(),
+    updatedAt: project.updatedAt ? new Date(project.updatedAt).toISOString() : new Date().toISOString(),
+  }));
 
   return (
     <DashboardClient
@@ -44,18 +34,9 @@ export default async function DashboardPage() {
         email: user?.email || '',
         plan: user?.plan || 'FREE',
         tokenBalance: user?.tokenBalance || 0,
-        projectCount: user?._count.projects || 0,
+        projectCount: projects.length,
       }}
-      projects={projects.map((p) => ({
-        id: p.id,
-        name: p.name,
-        description: p.description,
-        projectType: p.projectType,
-        messageCount: p._count.messages,
-        visibility: p.visibility,
-        createdAt: p.createdAt.toISOString(),
-        updatedAt: p.updatedAt.toISOString(),
-      }))}
+      projects={projectsWithCounts}
     />
   );
 }

@@ -1,0 +1,18 @@
+[Unit]
+Description=Vibing2 Next.js Application
+After=network.target
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/home/ubuntu/vibing2
+Environment=NODE_ENV=production
+ExecStart=/usr/bin/node /home/ubuntu/vibing2/server.js
+Restart=always
+RestartSec=10
+StandardOutput=syslog
+StandardError=syslog
+SyslogIdentifier=vibing2
+
+[Install]
+WantedBy=multi-user.target
