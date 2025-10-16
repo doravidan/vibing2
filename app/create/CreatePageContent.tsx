@@ -349,8 +349,8 @@ export default function CreatePageContent() {
         setActiveAgents(config.baseAgents);
       }
 
-      // Set input value
-      setInputValue(promptParam);
+      // DON'T set input value - we want to submit immediately without showing it
+      // setInputValue(promptParam);
 
       // Generate project title and then trigger submission
       const generateTitleAndSubmit = async () => {
