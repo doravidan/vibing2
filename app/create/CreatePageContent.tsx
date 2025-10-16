@@ -93,6 +93,7 @@ export default function CreatePageContent() {
   const latestProjectIdRef = useRef<string | null>(projectIdParam);
   const latestProjectTypeRef = useRef<ProjectType | null>(null);
   const hasAutoSubmittedRef = useRef<boolean>(false);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   // State
   const [currentProjectId, setCurrentProjectId] = useState<string | null>(projectIdParam);
@@ -333,6 +334,10 @@ export default function CreatePageContent() {
     if (typeParam && promptParam) {
       console.log('🚀 Auto-submitting from dashboard with type:', typeParam, 'and prompt:', promptParam);
 
+      // Mark as auto-submitted FIRST to prevent duplicate submissions
+      hasAutoSubmittedRef.current = true;
+      console.log('✅ Marked as auto-submitted');
+
       // Set project type
       const projectTypeValue = typeParam as ProjectType;
       setProjectType(projectTypeValue);
@@ -344,10 +349,6 @@ export default function CreatePageContent() {
 
       // Set input value
       setInputValue(promptParam);
-
-      // Mark as auto-submitted FIRST to prevent duplicate submissions
-      hasAutoSubmittedRef.current = true;
-      console.log('✅ Marked as auto-submitted');
 
       // Generate project title and then trigger submission
       const generateTitleAndSubmit = async () => {
@@ -391,7 +392,8 @@ export default function CreatePageContent() {
     } else {
       console.log('❌ Not auto-submitting - missing type or prompt');
     }
-  }, [searchParams, projectIdParam]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Run only once on mount
 
   // Handle project type selection
   const handleProjectTypeSelect = (type: ProjectType) => {
@@ -401,6 +403,22 @@ export default function CreatePageContent() {
     if (config) {
       setActiveAgents(config.baseAgents);
     }
+  };
+
+  // Handle stop generation
+  const handleStop = () => {
+    console.log('🛑 Stopping generation...');
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+    setIsLoading(false);
+    setProgress('');
+    setError('Generation stopped by user');
+    addActivity({
+      type: 'error',
+      message: 'Generation stopped by user',
+    });
   };
 
   // Handle form submit
@@ -500,6 +518,9 @@ export default function CreatePageContent() {
     await new Promise(resolve => setTimeout(resolve, 800)); // Brief pause to show agent selection
     setProgress('Starting generation...');
 
+    // Create abort controller for cancellation
+    abortControllerRef.current = new AbortController();
+
     // Create timeout signal (5 minutes)
     const { signal, clear: clearTimeout } = createTimeoutSignal(5 * 60 * 1000);
     let assistantMessage = '';
@@ -520,7 +541,7 @@ export default function CreatePageContent() {
         url: '/api/agent/stream',
         method: 'POST',
         body: requestBody,
-        signal,
+        signal: abortControllerRef.current.signal,
         maxRetries: 3,
         retryDelay: 2000,
 
@@ -799,11 +820,15 @@ ${jsFile.content}
       });
     } catch (error: any) {
       console.error('Generation error:', error);
-      setError(error.message || 'Failed to generate project');
+      // Don't show error if it was an abort (user clicked stop)
+      if (error.name !== 'AbortError') {
+        setError(error.message || 'Failed to generate project');
+      }
       setIsLoading(false);
       setProgress('');
     } finally {
       clearTimeout();
+      abortControllerRef.current = null;
     }
   };
 
@@ -1137,13 +1162,23 @@ ${jsFile.content}
                     console.error('Voice recording error:', error);
                   }}
                 />
-                <button
-                  type="submit"
-                  disabled={isLoading || (!inputValue.trim() && uploadedFiles.length === 0)}
-                  className="px-6 py-3 bg-gradient-to-r from-purple-500 to-pink-500 text-white font-semibold rounded-xl hover:shadow-lg hover:shadow-purple-500/50 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {isLoading ? '⏳' : '🚀'}
-                </button>
+                {isLoading ? (
+                  <button
+                    type="button"
+                    onClick={handleStop}
+                    className="px-6 py-3 bg-gradient-to-r from-red-500 to-red-600 text-white font-semibold rounded-xl hover:shadow-lg hover:shadow-red-500/50 transition-all"
+                  >
+                    Stop
+                  </button>
+                ) : (
+                  <button
+                    type="submit"
+                    disabled={!inputValue.trim() && uploadedFiles.length === 0}
+                    className="px-6 py-3 bg-gradient-to-r from-purple-500 to-pink-500 text-white font-semibold rounded-xl hover:shadow-lg hover:shadow-purple-500/50 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    🚀
+                  </button>
+                )}
               </form>
             </div>
           </footer>
