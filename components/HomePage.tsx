@@ -74,15 +74,24 @@ export default function HomePage({ session }: HomePageProps) {
     }
 
     try {
+      console.log('🗑️ Deleting project:', projectId);
       const response = await fetch(`/api/projects/${projectId}`, {
         method: 'DELETE'
       });
 
-      if (response.ok) {
+      const data = await response.json();
+      console.log('Delete response:', data);
+
+      if (response.ok && data.success) {
+        // Remove from UI immediately
         setProjects(projects.filter(p => p.id !== projectId));
+        alert('Project deleted successfully!');
+      } else {
+        alert(`Failed to delete project: ${data.error || 'Unknown error'}`);
       }
     } catch (error) {
       console.error('Failed to delete project:', error);
+      alert('Failed to delete project. Please try again.');
     }
   };
 

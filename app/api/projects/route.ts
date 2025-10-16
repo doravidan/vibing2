@@ -37,7 +37,7 @@ export async function GET(req: NextRequest) {
       success: true,
       projects: result.projects.map((p: any) => ({
         id: p.id,
-        name: p.name,
+        name: p.name || p.title || 'Untitled Project',
         description: p.description,
         projectType: p.projectType,
         activeAgents: p.activeAgents ? JSON.parse(p.activeAgents) : [],
