@@ -4,6 +4,8 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { signOut } from 'next-auth/react';
 import Link from 'next/link';
+import FileUpload, { UploadedFile } from '@/components/FileUpload';
+import VoiceRecorder from '@/components/VoiceRecorder';
 
 interface Project {
   id: string;
@@ -33,6 +35,10 @@ export default function DashboardClient({ user, projects: initialProjects }: Pro
   const router = useRouter();
   const [projects, setProjects] = useState(initialProjects);
   const [deleting, setDeleting] = useState<string | null>(null);
+  const [initialPrompt, setInitialPrompt] = useState('');
+  const [selectedProjectType, setSelectedProjectType] = useState<string | null>(null);
+  const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
+  const [showFileUpload, setShowFileUpload] = useState(false);
 
   const handleDelete = async (projectId: string) => {
     if (!confirm('Are you sure you want to delete this project?')) return;
@@ -84,6 +90,69 @@ export default function DashboardClient({ user, projects: initialProjects }: Pro
       year: 'numeric',
     });
   };
+
+  const handleSelectProjectType = (projectType: string) => {
+    setSelectedProjectType(projectType);
+  };
+
+  const handleStartProject = () => {
+    if (!selectedProjectType) {
+      alert('Please select a project type');
+      return;
+    }
+    if (!initialPrompt.trim() && uploadedFiles.length === 0) {
+      alert('Please enter a description for your project or upload files');
+      return;
+    }
+
+    // Build rich prompt with file attachments
+    let enrichedPrompt = initialPrompt.trim();
+
+    if (uploadedFiles.length > 0) {
+      enrichedPrompt += '\n\n---\n\n**Attached Files:**\n\n';
+
+      for (const file of uploadedFiles) {
+        enrichedPrompt += `### ${file.name} (${(file.size / 1024).toFixed(1)}KB)\n\n`;
+
+        if (file.type.startsWith('image/')) {
+          // For images, include base64 data for Claude's vision capabilities
+          enrichedPrompt += `![${file.name}](${file.data})\n\n`;
+          enrichedPrompt += `*Image attached - please analyze this image and incorporate insights into your response.*\n\n`;
+        } else if (file.type.startsWith('text/') ||
+                   file.name.endsWith('.json') ||
+                   file.name.endsWith('.md') ||
+                   file.name.endsWith('.txt') ||
+                   file.name.endsWith('.csv')) {
+          // For text files, include the actual content
+          enrichedPrompt += '```\n' + file.data + '\n```\n\n';
+        } else {
+          // For other files, just mention them
+          enrichedPrompt += `*File attached (${file.type || 'unknown type'})*\n\n`;
+        }
+      }
+    }
+
+    // Navigate to create page with project type and enriched prompt
+    const params = new URLSearchParams();
+    params.set('type', selectedProjectType);
+    params.set('prompt', enrichedPrompt);
+    router.push(`/create?${params.toString()}`);
+  };
+
+  const handleKeyPress = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleStartProject();
+    }
+  };
+
+  const projectTypes = [
+    { id: 'WEBSITE', name: 'Website', emoji: '🌐' },
+    { id: 'MOBILE_APP', name: 'Mobile App', emoji: '📱' },
+    { id: 'GAME', name: 'Game', emoji: '🎮' },
+    { id: 'API', name: 'API', emoji: '⚡' },
+    { id: 'DASHBOARD', name: 'Dashboard', emoji: '📊' },
+  ];
 
   return (
     <div className="min-h-screen bg-gray-950 overflow-hidden relative">
@@ -150,6 +219,107 @@ export default function DashboardClient({ user, projects: initialProjects }: Pro
           <p className="text-gray-400">Continue building amazing projects with AI</p>
         </div>
 
+        {/* Create New Project Section */}
+        <div className="backdrop-blur-xl bg-gradient-to-r from-purple-500/10 to-pink-500/10 border border-white/20 rounded-3xl p-8 mb-8">
+          <div className="mb-6">
+            <h2 className="text-2xl font-bold text-white mb-2">Start a new project</h2>
+            <p className="text-gray-400 text-sm">Describe what you want to build and choose a project type</p>
+          </div>
+
+          {/* Free Text Input with File Upload */}
+          <div className="mb-6">
+            {/* File Upload Section (Collapsible) */}
+            {showFileUpload && (
+              <div className="bg-white/5 border border-white/10 rounded-xl p-4 mb-3">
+                <FileUpload
+                  files={uploadedFiles}
+                  onFilesChange={setUploadedFiles}
+                />
+              </div>
+            )}
+
+            {/* Input Row with Buttons */}
+            <div className="flex gap-2">
+              {/* File Attach Button */}
+              <button
+                type="button"
+                onClick={() => setShowFileUpload(!showFileUpload)}
+                className={`relative p-3 rounded-xl transition-all ${
+                  showFileUpload || uploadedFiles.length > 0
+                    ? 'bg-purple-500/20 border-2 border-purple-500 text-purple-400'
+                    : 'bg-white/10 border border-white/20 text-gray-400 hover:text-white hover:bg-white/20'
+                }`}
+                title="Attach files or images"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+                </svg>
+                {uploadedFiles.length > 0 && (
+                  <span className="absolute -top-1 -right-1 w-5 h-5 bg-purple-500 text-white text-xs rounded-full flex items-center justify-center font-bold">
+                    {uploadedFiles.length}
+                  </span>
+                )}
+              </button>
+
+              {/* Textarea */}
+              <textarea
+                value={initialPrompt}
+                onChange={(e) => setInitialPrompt(e.target.value)}
+                onKeyDown={handleKeyPress}
+                placeholder="Describe what you want to build... (🎤 voice, Ctrl+V paste, 📎 attach files)"
+                className="flex-1 h-24 bg-white/10 border border-white/20 rounded-xl px-6 py-4 text-white placeholder-white/40 focus:outline-none focus:border-purple-500/50 resize-none backdrop-blur-xl"
+              />
+
+              {/* Voice Recorder Button */}
+              <VoiceRecorder
+                onTranscription={(text) => {
+                  setInitialPrompt(prev => prev ? `${prev} ${text}` : text);
+                }}
+                onError={(error) => {
+                  console.error('Voice recording error:', error);
+                }}
+              />
+            </div>
+          </div>
+
+          {/* Project Type Buttons */}
+          <div className="mb-6">
+            <p className="text-white/80 text-sm mb-3">Select project type:</p>
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+              {projectTypes.map((type) => (
+                <button
+                  key={type.id}
+                  onClick={() => handleSelectProjectType(type.id)}
+                  className={`group p-4 backdrop-blur-xl border rounded-xl transition-all duration-300 text-center ${
+                    selectedProjectType === type.id
+                      ? 'bg-purple-500/30 border-purple-500 scale-105'
+                      : 'bg-white/10 border-white/20 hover:bg-white/20 hover:scale-105'
+                  }`}
+                >
+                  <div className="text-3xl mb-2">{type.emoji}</div>
+                  <h3 className="text-sm font-semibold text-white">{type.name}</h3>
+                  {selectedProjectType === type.id && (
+                    <div className="mt-2 text-xs text-purple-300">✓ Selected</div>
+                  )}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Start Button */}
+          <div className="flex justify-end">
+            <button
+              onClick={handleStartProject}
+              disabled={!selectedProjectType || (!initialPrompt.trim() && uploadedFiles.length === 0)}
+              className="px-8 py-3 bg-gradient-to-r from-purple-500 via-pink-500 to-cyan-500 text-white rounded-xl font-semibold hover:scale-105 transition-all shadow-lg shadow-purple-500/50 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+            >
+              {!selectedProjectType || (!initialPrompt.trim() && uploadedFiles.length === 0)
+                ? 'Enter prompt/files and select type to start'
+                : 'Start Building 🚀'}
+            </button>
+          </div>
+        </div>
+
         {/* Stats Cards with Glassmorphism */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
           <div className="group relative backdrop-blur-xl bg-white/5 border border-white/10 rounded-2xl p-6 hover:bg-white/10 transition-all hover:scale-105">
@@ -188,19 +358,9 @@ export default function DashboardClient({ user, projects: initialProjects }: Pro
 
         {/* Projects Section */}
         <div className="backdrop-blur-xl bg-white/5 border border-white/10 rounded-3xl p-8">
-          <div className="flex items-center justify-between mb-8">
-            <div>
-              <h2 className="text-2xl font-bold text-white mb-1">Your Projects</h2>
-              <p className="text-gray-400 text-sm">Create and manage your AI-powered projects</p>
-            </div>
-            <div className="flex gap-3">
-              <Link
-                href="/create"
-                className="px-6 py-3 bg-gradient-to-r from-purple-500 via-pink-500 to-cyan-500 text-white rounded-xl font-semibold hover:scale-105 transition-all shadow-lg shadow-purple-500/50"
-              >
-                + New Project
-              </Link>
-            </div>
+          <div className="mb-8">
+            <h2 className="text-2xl font-bold text-white mb-1">Your Projects</h2>
+            <p className="text-gray-400 text-sm">Continue working on your existing projects</p>
           </div>
 
           {projects.length === 0 ? (

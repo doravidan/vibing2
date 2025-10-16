@@ -11,11 +11,14 @@ export default function VoiceRecorder({ onTranscription, onError }: VoiceRecorde
   const [isRecording, setIsRecording] = useState(false);
   const [isSupported, setIsSupported] = useState(true);
   const [interimTranscript, setInterimTranscript] = useState('');
+  const [mounted, setMounted] = useState(false);
 
   const recognitionRef = useRef<any>(null);
 
   // Check browser support on mount
   useEffect(() => {
+    setMounted(true);
+
     // Check if Web Speech API is supported
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
 
@@ -162,6 +165,22 @@ export default function VoiceRecorder({ onTranscription, onError }: VoiceRecorde
       startRecording();
     }
   };
+
+  // Don't render if not mounted (prevents hydration mismatch)
+  if (!mounted) {
+    return (
+      <button
+        type="button"
+        disabled
+        className="p-3 rounded-xl bg-white/10 border border-white/20 text-gray-400"
+        title="Loading voice recorder..."
+      >
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
+        </svg>
+      </button>
+    );
+  }
 
   // Don't render if not supported
   if (!isSupported) {

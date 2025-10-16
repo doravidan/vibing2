@@ -10,6 +10,7 @@ import { PROJECT_TYPES, ProjectType, selectAdditionalAgents, getProjectTypeConfi
 import { streamSSE, createTimeoutSignal } from '@/lib/sse-parser';
 import FileUpload, { UploadedFile } from '@/components/FileUpload';
 import VoiceRecorder from '@/components/VoiceRecorder';
+import ActivityFeed from '@/components/ActivityFeed';
 
 interface Message {
   id: string;
@@ -29,6 +30,16 @@ interface VersionSnapshot {
   previewCode: string;
   messages: Message[];
   label?: string;
+}
+
+interface Activity {
+  id: string;
+  type: 'thinking' | 'file' | 'progress' | 'complete' | 'error';
+  action?: string;
+  file?: string;
+  message?: string;
+  codePreview?: string;
+  timestamp: number;
 }
 
 // Helper function to extract summary from assistant message (text before first code block)
@@ -80,6 +91,8 @@ export default function CreatePageContent() {
   const latestPreviewCodeRef = useRef<string>('');
   const latestMessagesRef = useRef<Message[]>([]);
   const latestProjectIdRef = useRef<string | null>(projectIdParam);
+  const latestProjectTypeRef = useRef<ProjectType | null>(null);
+  const hasAutoSubmittedRef = useRef<boolean>(false);
 
   // State
   const [currentProjectId, setCurrentProjectId] = useState<string | null>(projectIdParam);
@@ -101,7 +114,13 @@ export default function CreatePageContent() {
     outputTokens?: number;
     contextPercentage?: number;
     duration?: number;
-  } | null>(null);
+  }>({
+    tokensUsed: 0,
+    inputTokens: 0,
+    outputTokens: 0,
+    contextPercentage: 0,
+    duration: 0,
+  });
   const [lastPromptMetrics, setLastPromptMetrics] = useState<{
     tokensUsed?: number;
     inputTokens?: number;
@@ -114,11 +133,48 @@ export default function CreatePageContent() {
   const [autoSaveStatus, setAutoSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
   const [showFileUpload, setShowFileUpload] = useState(false);
+  const [activities, setActivities] = useState<Activity[]>([]);
+  const [projectTitle, setProjectTitle] = useState<string>('');
+  const [generatingTitle, setGeneratingTitle] = useState(false);
+
+  // Helper to add activities
+  const addActivity = (activity: Omit<Activity, 'id' | 'timestamp'>) => {
+    setActivities(prev => [...prev, {
+      ...activity,
+      id: Date.now().toString() + Math.random(),
+      timestamp: Date.now(),
+    }]);
+  };
 
   // Auto-scroll to bottom when messages or progress change
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, progress, error]);
+
+  // Live duration tracking while agent is working
+  useEffect(() => {
+    let startTime: number | null = null;
+    let intervalId: NodeJS.Timeout | null = null;
+
+    if (isLoading) {
+      // Start tracking time
+      startTime = Date.now();
+
+      intervalId = setInterval(() => {
+        const elapsed = (Date.now() - startTime!) / 1000; // Convert to seconds
+        setMetrics(prev => ({
+          ...prev,
+          duration: elapsed,
+        }));
+      }, 100); // Update every 100ms for smooth animation
+    }
+
+    return () => {
+      if (intervalId) {
+        clearInterval(intervalId);
+      }
+    };
+  }, [isLoading]);
 
   // Handle clipboard paste for images and files
   useEffect(() => {
@@ -226,6 +282,7 @@ export default function CreatePageContent() {
             content: m.content,
           })));
           setProjectType(project.projectType);
+          latestProjectTypeRef.current = project.projectType;
           setActiveAgents(JSON.parse(project.activeAgents || '[]'));
 
           // Use currentCode from project if available
@@ -257,9 +314,89 @@ export default function CreatePageContent() {
     loadProject();
   }, [projectIdParam, session]);
 
+  // Handle URL parameters for auto-submit from dashboard
+  useEffect(() => {
+    console.log('🔍 Auto-submit effect triggered. hasAutoSubmitted:', hasAutoSubmittedRef.current);
+
+    // Only run if we have URL params and haven't auto-submitted yet
+    if (hasAutoSubmittedRef.current) {
+      console.log('⏭️ Skipping auto-submit - already submitted');
+      return;
+    }
+
+    const typeParam = searchParams.get('type');
+    const promptParam = searchParams.get('prompt');
+    console.log('📋 URL params - type:', typeParam, 'prompt:', promptParam?.substring(0, 50) + '...');
+
+    // Only auto-submit if we have both type and prompt
+    // Auto-submit even if projectId exists, as long as we haven't already done it
+    if (typeParam && promptParam) {
+      console.log('🚀 Auto-submitting from dashboard with type:', typeParam, 'and prompt:', promptParam);
+
+      // Set project type
+      const projectTypeValue = typeParam as ProjectType;
+      setProjectType(projectTypeValue);
+      latestProjectTypeRef.current = projectTypeValue;
+      const config = getProjectTypeConfig(projectTypeValue);
+      if (config) {
+        setActiveAgents(config.baseAgents);
+      }
+
+      // Set input value
+      setInputValue(promptParam);
+
+      // Mark as auto-submitted FIRST to prevent duplicate submissions
+      hasAutoSubmittedRef.current = true;
+      console.log('✅ Marked as auto-submitted');
+
+      // Generate project title and then trigger submission
+      const generateTitleAndSubmit = async () => {
+        setGeneratingTitle(true);
+        let generatedTitle = '';
+
+        try {
+          const response = await fetch('/api/projects/generate-title', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              prompt: promptParam,
+              projectType: projectTypeValue,
+            }),
+          });
+
+          const data = await response.json();
+          if (data.success && data.title) {
+            generatedTitle = data.title;
+            setProjectTitle(data.title);
+            console.log('✨ Generated project title:', data.title);
+          } else {
+            generatedTitle = `${config?.name || 'Untitled'} Project`;
+            setProjectTitle(generatedTitle);
+          }
+        } catch (err) {
+          console.error('Failed to generate title:', err);
+          generatedTitle = `${config?.name || 'Untitled'} Project`;
+          setProjectTitle(generatedTitle);
+        } finally {
+          setGeneratingTitle(false);
+        }
+
+        // NOW trigger submission after title is generated
+        console.log('⏰ Title generated - triggering handleSubmit with prompt:', promptParam, 'type:', projectTypeValue, 'title:', generatedTitle);
+        const fakeEvent = { preventDefault: () => {} } as React.FormEvent;
+        handleSubmit(fakeEvent, promptParam, projectTypeValue);
+      };
+
+      generateTitleAndSubmit();
+    } else {
+      console.log('❌ Not auto-submitting - missing type or prompt');
+    }
+  }, [searchParams, projectIdParam]);
+
   // Handle project type selection
   const handleProjectTypeSelect = (type: ProjectType) => {
     setProjectType(type);
+    latestProjectTypeRef.current = type;
     const config = getProjectTypeConfig(type);
     if (config) {
       setActiveAgents(config.baseAgents);
@@ -267,13 +404,24 @@ export default function CreatePageContent() {
   };
 
   // Handle form submit
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent, overridePrompt?: string, overrideProjectType?: ProjectType) => {
     e.preventDefault();
 
-    if ((!inputValue.trim() && uploadedFiles.length === 0) || isLoading || !projectType) return;
+    const promptToUse = overridePrompt || inputValue.trim();
+    const projectTypeToUse = overrideProjectType || projectType;
+
+    // Update the ref so auto-save always has the correct projectType
+    latestProjectTypeRef.current = projectTypeToUse;
+
+    if ((!promptToUse && uploadedFiles.length === 0) || isLoading || !projectTypeToUse) {
+      console.log('❌ handleSubmit early return:', { promptToUse, uploadedFiles: uploadedFiles.length, isLoading, projectType: projectTypeToUse });
+      return;
+    }
+
+    console.log('✅ handleSubmit executing with prompt:', promptToUse, 'and projectType:', projectTypeToUse);
 
     // Build rich prompt with file attachments
-    let enrichedPrompt = inputValue.trim();
+    let enrichedPrompt = promptToUse;
 
     if (uploadedFiles.length > 0) {
       enrichedPrompt += '\n\n---\n\n**Attached Files:**\n\n';
@@ -313,6 +461,13 @@ export default function CreatePageContent() {
     setError(null);
     setProgress('🤖 Analyzing prompt and selecting optimal agents...');
 
+    // Clear previous activities and add initial activity
+    setActivities([]);
+    addActivity({
+      type: 'progress',
+      message: 'Analyzing your prompt and selecting optimal agents...',
+    });
+
     // Automatically select agents based on prompt and context
     let selectedAgents = activeAgents;
     try {
@@ -320,8 +475,8 @@ export default function CreatePageContent() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          prompt: inputValue,
-          projectType,
+          prompt: promptToUse,
+          projectType: projectTypeToUse,
           existingFiles: projectFiles.map(f => f.path),
           currentCode: previewCode,
           conversationHistory: messages.slice(-3), // Last 3 messages for context
@@ -353,7 +508,7 @@ export default function CreatePageContent() {
       // Validate request body before sending
       const requestBody = {
         messages: [...messages, userMessage],
-        projectType,
+        projectType: projectTypeToUse,
         agents: selectedAgents,
         specializedAgent: selectedSpecializedAgent || undefined,
       };
@@ -377,6 +532,10 @@ export default function CreatePageContent() {
           switch (eventType) {
             case 'progress':
               setProgress(eventData.message || 'Processing...');
+              addActivity({
+                type: 'progress',
+                message: eventData.message || 'Processing...',
+              });
               if (eventData.sandboxId) {
                 setSandboxId(eventData.sandboxId);
               }
@@ -397,6 +556,11 @@ export default function CreatePageContent() {
             case 'tool':
               console.log('Tool action:', eventData.action, eventData.file);
               setProgress(`📝 ${eventData.action}: ${eventData.file}`);
+              addActivity({
+                type: 'file',
+                action: eventData.action,
+                file: eventData.file,
+              });
               break;
 
 
@@ -405,11 +569,21 @@ export default function CreatePageContent() {
               // Extract code from changes - support HTML and JavaScript
               console.log('Code changes received:', eventData);
               if (eventData.changes && Array.isArray(eventData.changes)) {
+                // Add activity for code changes
+                eventData.changes.forEach((change: any) => {
+                  addActivity({
+                    type: 'file',
+                    action: 'Updated',
+                    file: change.file || 'code',
+                    codePreview: change.content?.slice(0, 200),
+                  });
+                });
+
                 // First try to find HTML
-                let htmlChange = eventData.changes.find((c: any) => 
+                let htmlChange = eventData.changes.find((c: any) =>
                   c.language === 'html' || c.file?.endsWith('.html')
                 );
-                
+
                 // If no HTML found, check for JavaScript and wrap it
                 if (!htmlChange) {
                   const jsChange = eventData.changes.find((c: any) =>
@@ -482,6 +656,10 @@ ${jsFile.content}
             case 'complete':
             case 'metrics':
               setProgress('✅ Generation complete!');
+              addActivity({
+                type: 'complete',
+                message: 'Generation complete! Preview is ready.',
+              });
               if (eventData.previewUrl) {
                 setPreviewUrl(eventData.previewUrl);
               }
@@ -502,13 +680,13 @@ ${jsFile.content}
                 // Store last prompt metrics
                 setLastPromptMetrics(newMetrics);
 
-                // Update cumulative metrics
+                // Update cumulative metrics (preserve live duration if greater)
                 setMetrics(prev => ({
                   tokensUsed: (prev?.tokensUsed || 0) + (eventData.tokensUsed || 0),
                   inputTokens: (prev?.inputTokens || 0) + (eventData.inputTokens || 0),
                   outputTokens: (prev?.outputTokens || 0) + (eventData.outputTokens || 0),
                   contextPercentage: eventData.contextPercentage, // Use latest context percentage
-                  duration: (prev?.duration || 0) + (eventData.duration || 0),
+                  duration: Math.max(prev?.duration || 0, eventData.duration || 0), // Keep the larger duration (live or reported)
                 }));
               }
               break;
@@ -518,6 +696,10 @@ ${jsFile.content}
         onError: (error) => {
           console.error('Stream error:', error);
           setError(error.message || 'Stream connection failed');
+          addActivity({
+            type: 'error',
+            message: error.message || 'Stream connection failed',
+          });
         },
 
         onComplete: async () => {
@@ -564,11 +746,11 @@ ${jsFile.content}
             setVersionHistory((prev) => [...prev, snapshot]);
 
             // Auto-save project - capture current state immediately
-            // This ensures we use the LATEST projectId value, not a stale closure
+            // This ensures we use the LATEST projectId and projectType values, not stale closures
             const saveData = {
               projectId: latestProjectIdRef.current,
-              name: `${projectType} - ${new Date().toLocaleDateString()}`,
-              projectType,
+              name: projectTitle || `${latestProjectTypeRef.current} - ${new Date().toLocaleDateString()}`,
+              projectType: latestProjectTypeRef.current,
               activeAgents: JSON.stringify(activeAgents),
               messages: currentMessages,
               currentCode: currentPreviewCode,
@@ -655,8 +837,8 @@ ${jsFile.content}
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           projectId: projectIdParam || null,
-          name: `${projectType} - ${new Date().toLocaleDateString()}`,
-          projectType,
+          name: projectTitle || `${latestProjectTypeRef.current} - ${new Date().toLocaleDateString()}`,
+          projectType: latestProjectTypeRef.current,
           activeAgents: JSON.stringify(activeAgents),
           messages,
           currentCode: previewCode,
@@ -744,8 +926,19 @@ ${jsFile.content}
               <span className="text-white font-bold text-xl">Q</span>
             </div>
             <div>
-              <h1 className="text-xl font-bold text-white">
-                {getProjectTypeConfig(projectType)?.name}
+              <h1 className="text-xl font-bold text-white flex items-center gap-2">
+                {generatingTitle ? (
+                  <>
+                    <span className="animate-pulse">Generating title...</span>
+                    <div className="w-4 h-4 border-2 border-purple-500 border-t-transparent rounded-full animate-spin"></div>
+                  </>
+                ) : projectTitle ? (
+                  <>
+                    {projectTitle}
+                  </>
+                ) : (
+                  getProjectTypeConfig(projectType)?.name
+                )}
               </h1>
               <p className="text-sm text-white/60">
                 Powered by Daytona Sandbox
@@ -792,8 +985,7 @@ ${jsFile.content}
       </header>
 
       {/* Monitoring Stripe - Live Metrics */}
-      {metrics && (
-        <div className="border-y border-white/10 bg-gradient-to-r from-purple-900/30 via-pink-900/30 to-purple-900/30 backdrop-blur-lg">
+      <div className="border-y border-white/10 bg-gradient-to-r from-purple-900/30 via-pink-900/30 to-purple-900/30 backdrop-blur-lg">
           <div className="px-6 py-3 space-y-2">
             {/* Last Prompt Usage */}
             {lastPromptMetrics && (
@@ -866,169 +1058,13 @@ ${jsFile.content}
             </div>
           </div>
         </div>
-      )}
 
       {/* Main Content */}
       <div className="flex-1 flex overflow-hidden">
-        {/* Left Panel - Chat (30%) */}
+        {/* Left Panel - Activity Feed (30%) */}
         <div className="w-[30%] flex flex-col border-r border-white/10 backdrop-blur-xl bg-white/5">
-          <main className="flex-1 overflow-y-auto px-4 py-6 space-y-4">
-            {messages.length === 0 && (
-              <div className="text-center py-12 backdrop-blur-lg bg-white/5 rounded-2xl border border-white/10">
-                <h2 className="text-2xl font-semibold bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent mb-2">
-                  Describe your {getProjectTypeConfig(projectType)?.name.toLowerCase()}
-                </h2>
-                <p className="text-white/60 text-sm">
-                  AI will generate it in a secure Daytona sandbox
-                </p>
-              </div>
-            )}
-
-            {/* Agent Summary - Show latest assistant message summary */}
-            {messages.length > 0 && messages[messages.length - 1]?.role === 'assistant' && (
-              <div className="bg-gradient-to-br from-purple-500/10 to-pink-500/10 border border-purple-500/30 rounded-xl p-4 mb-4">
-                <div className="flex items-start gap-3">
-                  <div className="text-2xl">🤖</div>
-                  <div className="flex-1">
-                    <h3 className="text-sm font-semibold text-white mb-2">Agent Summary</h3>
-                    <p className="text-white/80 text-sm leading-relaxed">
-                      {extractSummary(messages[messages.length - 1].content)}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {messages.map((message) => {
-              const sections = message.role === 'assistant' 
-                ? formatAssistantMessage(message.content)
-                : [{ type: 'text', content: message.content }];
-
-              return (
-                <div
-                  key={message.id}
-                  className={`rounded-xl overflow-hidden ${
-                    message.role === 'user'
-                      ? 'bg-gradient-to-r from-purple-500/20 to-pink-500/20 border border-purple-500/30'
-                      : 'bg-white/5 border border-white/10'
-                  }`}
-                >
-                  <div className="px-4 pt-3 pb-2 border-b border-white/10">
-                    <div className="text-xs text-white/60 font-semibold">
-                      {message.role === 'user' ? '👤 You' : '🤖 AI Assistant'}
-                    </div>
-                  </div>
-                  <div className="p-4 space-y-3">
-                    {sections.map((section, idx) => (
-                      <div key={idx}>
-                        {section.type === 'text' ? (
-                          <div className="text-white/90 text-sm leading-relaxed">
-                            {section.content}
-                          </div>
-                        ) : section.type === 'code_hidden' ? (
-                          <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-3">
-                            <div className="flex items-center gap-2 text-blue-400 text-xs">
-                              <span>📄</span>
-                              <span>{section.content}</span>
-                            </div>
-                          </div>
-                        ) : (
-                          <div className="relative">
-                            <div className="absolute top-2 right-2 text-xs text-white/40 font-mono">
-                              {section.language}
-                            </div>
-                            <pre className="bg-black/30 border border-white/10 rounded-lg p-3 overflow-x-auto">
-                              <code className="text-xs text-cyan-400 font-mono">
-                                {section.content}
-                              </code>
-                            </pre>
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              );
-            })}
-
-            {isLoading && (
-              <div className="p-4 bg-white/5 border border-white/10 rounded-xl">
-                <div className="flex items-center gap-3">
-                  <div className="animate-spin w-5 h-5 border-2 border-purple-500 border-t-transparent rounded-full"></div>
-                  <div className="text-white/80 text-sm">{progress}</div>
-                </div>
-              </div>
-            )}
-
-            {error && (
-              <div className="p-4 bg-red-500/20 border border-red-500/30 rounded-xl">
-                <div className="text-red-400 text-sm">{error}</div>
-              </div>
-            )}
-
-
-            {/* Metrics Display */}
-            {metrics && !isLoading && (
-              <div className="space-y-3">
-                {/* Last Prompt Metrics */}
-                {lastPromptMetrics && (
-                  <div className="p-4 bg-gradient-to-r from-blue-500/10 to-cyan-500/10 border border-blue-500/30 rounded-xl">
-                    <div className="text-xs text-blue-400 font-semibold mb-2">💬 Last Prompt Metrics</div>
-                    <div className="grid grid-cols-2 gap-2 text-xs">
-                      <div className="flex justify-between">
-                        <span className="text-white/60">Tokens:</span>
-                        <span className="text-white font-mono">{lastPromptMetrics.tokensUsed?.toLocaleString()}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-white/60">Context:</span>
-                        <span className="text-white font-mono">{lastPromptMetrics.contextPercentage?.toFixed(2)}%</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-white/60">Input:</span>
-                        <span className="text-cyan-400 font-mono">{lastPromptMetrics.inputTokens}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-white/60">Output:</span>
-                        <span className="text-cyan-400 font-mono">{lastPromptMetrics.outputTokens}</span>
-                      </div>
-                      <div className="flex justify-between col-span-2">
-                        <span className="text-white/60">Duration:</span>
-                        <span className="text-green-400 font-mono">{lastPromptMetrics.duration?.toFixed(2)}s</span>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* Overall Session Metrics */}
-                <div className="p-4 bg-gradient-to-r from-purple-500/10 to-pink-500/10 border border-purple-500/30 rounded-xl">
-                  <div className="text-xs text-purple-400 font-semibold mb-2">📊 Overall Session Metrics</div>
-                  <div className="grid grid-cols-2 gap-2 text-xs">
-                    <div className="flex justify-between">
-                      <span className="text-white/60">Total Tokens:</span>
-                      <span className="text-white font-mono">{metrics.tokensUsed?.toLocaleString()}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-white/60">Context:</span>
-                      <span className="text-white font-mono">{metrics.contextPercentage?.toFixed(2)}%</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-white/60">Total Input:</span>
-                      <span className="text-cyan-400 font-mono">{metrics.inputTokens?.toLocaleString()}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-white/60">Total Output:</span>
-                      <span className="text-cyan-400 font-mono">{metrics.outputTokens?.toLocaleString()}</span>
-                    </div>
-                    <div className="flex justify-between col-span-2">
-                      <span className="text-white/60">Total Duration:</span>
-                      <span className="text-green-400 font-mono">{metrics.duration?.toFixed(2)}s</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-            {/* Scroll anchor */}
-            <div ref={messagesEndRef} />
+          <main className="flex-1 overflow-y-auto px-4 py-6">
+            <ActivityFeed activities={activities} isActive={isLoading} />
           </main>
 
           {/* Input Footer */}

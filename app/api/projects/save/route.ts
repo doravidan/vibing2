@@ -176,6 +176,7 @@ export async function POST(req: NextRequest) {
     console.log('✅ Save complete, returning response');
     return NextResponse.json({
       success: true,
+      projectId: finalProjectId,
       project: {
         id: finalProjectId,
         name: name || 'Untitled Project',
