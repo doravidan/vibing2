@@ -481,6 +481,16 @@ export default function CreatePageContent() {
     setError(null);
     setProgress('🤖 Analyzing prompt and selecting optimal agents...');
 
+    // Reset metrics for new generation
+    setMetrics({
+      tokensUsed: 0,
+      inputTokens: 0,
+      outputTokens: 0,
+      contextPercentage: 0,
+      duration: 0,
+    });
+    setLastPromptMetrics(null);
+
     // Clear previous activities and add initial activity
     setActivities([]);
     addActivity({
@@ -691,7 +701,7 @@ ${jsFile.content}
               }
               // Capture metrics for both last prompt and cumulative
               if (eventType === 'metrics' && eventData) {
-                console.log('Metrics received:', eventData);
+                console.log('📊 Metrics received:', eventData);
                 const newMetrics = {
                   tokensUsed: eventData.tokensUsed,
                   inputTokens: eventData.inputTokens,
@@ -700,15 +710,15 @@ ${jsFile.content}
                   duration: eventData.duration,
                 };
 
-                // Store last prompt metrics
+                // Store last prompt metrics (metrics from this single call)
                 setLastPromptMetrics(newMetrics);
 
-                // Update cumulative metrics (preserve live duration if greater)
+                // Update total metrics (replace with latest totals from backend)
                 setMetrics(prev => ({
-                  tokensUsed: (prev?.tokensUsed || 0) + (eventData.tokensUsed || 0),
-                  inputTokens: (prev?.inputTokens || 0) + (eventData.inputTokens || 0),
-                  outputTokens: (prev?.outputTokens || 0) + (eventData.outputTokens || 0),
-                  contextPercentage: eventData.contextPercentage, // Use latest context percentage
+                  tokensUsed: eventData.tokensUsed || prev.tokensUsed || 0,
+                  inputTokens: eventData.inputTokens || prev.inputTokens || 0,
+                  outputTokens: eventData.outputTokens || prev.outputTokens || 0,
+                  contextPercentage: eventData.contextPercentage || prev.contextPercentage || 0,
                   duration: Math.max(prev?.duration || 0, eventData.duration || 0), // Keep the larger duration (live or reported)
                 }));
               }
@@ -1317,15 +1327,15 @@ ${jsFile.content}
                   <button
                     type="button"
                     onClick={handleStop}
-                    className="px-6 py-3 bg-gradient-to-r from-red-500 to-red-600 text-white font-semibold rounded-xl hover:shadow-lg hover:shadow-red-500/50 transition-all"
+                    className="px-4 py-2 bg-gradient-to-r from-red-500 to-red-600 text-white font-semibold rounded-lg hover:shadow-lg hover:shadow-red-500/50 transition-all text-sm"
                   >
-                    Stop
+                    ⏹ Stop
                   </button>
                 ) : (
                   <button
                     type="submit"
                     disabled={!inputValue.trim() && uploadedFiles.length === 0}
-                    className="px-6 py-3 bg-gradient-to-r from-purple-500 to-pink-500 text-white font-semibold rounded-xl hover:shadow-lg hover:shadow-purple-500/50 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="px-4 py-2 bg-gradient-to-r from-purple-500 to-pink-500 text-white font-semibold rounded-lg hover:shadow-lg hover:shadow-purple-500/50 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     🚀
                   </button>
