@@ -929,10 +929,10 @@ ${jsFile.content}
 
           <div className="text-center mt-8">
             <button
-              onClick={() => router.push('/dashboard')}
+              onClick={() => router.push('/')}
               className="px-6 py-3 bg-white/10 text-white rounded-xl hover:bg-white/20 transition-all"
             >
-              ← Back to Dashboard
+              ← Back to Home
             </button>
           </div>
         </div>
@@ -1000,10 +1000,10 @@ ${jsFile.content}
             )}
 
             <button
-              onClick={() => router.push('/dashboard')}
+              onClick={() => router.push('/')}
               className="px-4 py-2 text-sm backdrop-blur-lg bg-white/10 text-gray-300 hover:text-white border border-white/10 rounded-lg hover:bg-white/20 transition-all"
             >
-              ← Dashboard
+              ← Home
             </button>
           </div>
         </div>

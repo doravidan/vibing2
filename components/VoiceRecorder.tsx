@@ -19,6 +19,16 @@ export default function VoiceRecorder({ onTranscription, onError }: VoiceRecorde
   useEffect(() => {
     setMounted(true);
 
+    // Check if running in a secure context (HTTPS or localhost)
+    // Web Speech API requires HTTPS except on localhost
+    const isSecureContext = window.isSecureContext || window.location.hostname === 'localhost';
+
+    if (!isSecureContext) {
+      setIsSupported(false);
+      console.warn('⚠️ Web Speech API requires HTTPS. Please access via HTTPS to use voice input.');
+      return;
+    }
+
     // Check if Web Speech API is supported
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
 
@@ -154,7 +164,7 @@ export default function VoiceRecorder({ onTranscription, onError }: VoiceRecorde
 
   const handleClick = () => {
     if (!isSupported) {
-      const errorMsg = 'Voice input not supported in this browser. Please use Chrome, Edge, or Safari.';
+      const errorMsg = 'Voice input requires HTTPS. Please access this site via a secure connection.';
       if (onError) onError(errorMsg);
       return;
     }
@@ -182,21 +192,9 @@ export default function VoiceRecorder({ onTranscription, onError }: VoiceRecorde
     );
   }
 
-  // Don't render if not supported
+  // Don't render if not supported (HTTPS required or browser incompatible)
   if (!isSupported) {
-    return (
-      <button
-        type="button"
-        disabled
-        className="p-3 rounded-xl bg-gray-700 border border-gray-600 text-gray-500 cursor-not-allowed"
-        title="Voice input not supported in this browser"
-      >
-        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
-          <line x1="2" y1="2" x2="22" y2="22" stroke="currentColor" strokeWidth={2} />
-        </svg>
-      </button>
-    );
+    return null; // Hide the button completely when not supported
   }
 
   return (
