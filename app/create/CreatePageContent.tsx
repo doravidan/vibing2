@@ -137,6 +137,8 @@ export default function CreatePageContent() {
   const [activities, setActivities] = useState<Activity[]>([]);
   const [projectTitle, setProjectTitle] = useState<string>('');
   const [generatingTitle, setGeneratingTitle] = useState(false);
+  const [viewMode, setViewMode] = useState<'preview' | 'code' | 'split'>('preview');
+  const [isExportMenuOpen, setIsExportMenuOpen] = useState(false);
 
   // Helper to add activities
   const addActivity = (activity: Omit<Activity, 'id' | 'timestamp'>) => {
@@ -886,6 +888,107 @@ ${jsFile.content}
     }
   };
 
+  // Export Functions
+  const handleDownloadHTML = () => {
+    if (!previewCode) {
+      alert('No code to download');
+      return;
+    }
+
+    const blob = new Blob([previewCode], { type: 'text/html' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${projectTitle || 'project'}.html`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    setIsExportMenuOpen(false);
+  };
+
+  const handleDownloadZIP = async () => {
+    if (!previewCode) {
+      alert('No code to download');
+      return;
+    }
+
+    try {
+      const JSZip = (await import('jszip')) as any;
+      const zip = new JSZip.default ? new JSZip.default() : new JSZip();
+
+      // Extract CSS from style tags
+      const styleRegex = /<style[^>]*>([\s\S]*?)<\/style>/gi;
+      const styles: string[] = [];
+      let match;
+      while ((match = styleRegex.exec(previewCode)) !== null) {
+        styles.push(match[1]);
+      }
+
+      // Extract JavaScript from script tags
+      const scriptRegex = /<script[^>]*>([\s\S]*?)<\/script>/gi;
+      const scripts: string[] = [];
+      while ((match = scriptRegex.exec(previewCode)) !== null) {
+        scripts.push(match[1]);
+      }
+
+      // Create cleaned HTML (remove style and script tags)
+      let cleanedHTML = previewCode
+        .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
+        .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '');
+
+      // Add links to external files if we extracted any
+      if (styles.length > 0) {
+        cleanedHTML = cleanedHTML.replace('</head>', '  <link rel="stylesheet" href="styles.css">\n</head>');
+      }
+      if (scripts.length > 0) {
+        cleanedHTML = cleanedHTML.replace('</body>', '  <script src="script.js"></script>\n</body>');
+      }
+
+      // Add files to ZIP
+      zip.file('index.html', cleanedHTML);
+
+      if (styles.length > 0) {
+        zip.file('styles.css', styles.join('\n\n'));
+      }
+
+      if (scripts.length > 0) {
+        zip.file('script.js', scripts.join('\n\n'));
+      }
+
+      // Generate and download ZIP
+      const blob = await zip.generateAsync({ type: 'blob' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${projectTitle || 'project'}.zip`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      setIsExportMenuOpen(false);
+    } catch (error) {
+      console.error('Error creating ZIP:', error);
+      alert('Failed to create ZIP file');
+    }
+  };
+
+  const handleCopyCode = async () => {
+    if (!previewCode) {
+      alert('No code to copy');
+      return;
+    }
+
+    try {
+      await navigator.clipboard.writeText(previewCode);
+      alert('Code copied to clipboard!');
+      setIsExportMenuOpen(false);
+    } catch (error) {
+      console.error('Failed to copy:', error);
+      alert('Failed to copy code');
+    }
+  };
+
   // Project type selection screen
   if (!projectType) {
     return (
@@ -985,6 +1088,54 @@ ${jsFile.content}
                     <span className="text-green-500">✓</span>
                     <span className="text-white/80 text-sm">Saved</span>
                   </>
+                )}
+              </div>
+            )}
+
+            {/* Export Dropdown */}
+            {previewCode && (
+              <div className="relative">
+                <button
+                  onClick={() => setIsExportMenuOpen(!isExportMenuOpen)}
+                  onBlur={() => setTimeout(() => setIsExportMenuOpen(false), 200)}
+                  className="px-4 py-2 bg-gradient-to-r from-green-500 to-emerald-500 text-white text-sm font-semibold rounded-lg hover:from-green-600 hover:to-emerald-600 shadow-lg flex items-center gap-2"
+                >
+                  <span>⬇️</span>
+                  Export
+                </button>
+                {isExportMenuOpen && (
+                  <div className="absolute right-0 top-full mt-2 w-56 bg-gray-900 border border-white/20 rounded-lg shadow-xl overflow-hidden z-50">
+                    <button
+                      onClick={handleDownloadHTML}
+                      className="w-full text-left px-4 py-3 text-white hover:bg-white/10 transition-colors flex items-center gap-3"
+                    >
+                      <span>📄</span>
+                      <div>
+                        <div className="font-semibold">Download HTML</div>
+                        <div className="text-xs text-white/60">Single file download</div>
+                      </div>
+                    </button>
+                    <button
+                      onClick={handleDownloadZIP}
+                      className="w-full text-left px-4 py-3 text-white hover:bg-white/10 transition-colors flex items-center gap-3 border-t border-white/10"
+                    >
+                      <span>🗜️</span>
+                      <div>
+                        <div className="font-semibold">Download ZIP</div>
+                        <div className="text-xs text-white/60">Separate HTML, CSS, JS</div>
+                      </div>
+                    </button>
+                    <button
+                      onClick={handleCopyCode}
+                      className="w-full text-left px-4 py-3 text-white hover:bg-white/10 transition-colors flex items-center gap-3 border-t border-white/10"
+                    >
+                      <span>📋</span>
+                      <div>
+                        <div className="font-semibold">Copy to Clipboard</div>
+                        <div className="text-xs text-white/60">Copy HTML code</div>
+                      </div>
+                    </button>
+                  </div>
                 )}
               </div>
             )}
@@ -1187,52 +1338,185 @@ ${jsFile.content}
         {/* Right Panel - Preview (70%) */}
         <div className="w-[70%] flex flex-col backdrop-blur-xl bg-gray-900/50">
           <div className="border-b border-white/10 px-6 py-3 flex items-center justify-between">
-            <h3 className="text-white font-semibold">Live Preview</h3>
-            {sandboxId && (
-              <div className="text-xs text-white/60">
-                Sandbox: {sandboxId}
+            <h3 className="text-white font-semibold">Output</h3>
+            <div className="flex items-center gap-4">
+              {/* View Mode Toggle */}
+              <div className="flex items-center gap-1 bg-white/5 border border-white/10 rounded-lg p-1">
+                <button
+                  onClick={() => setViewMode('preview')}
+                  className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
+                    viewMode === 'preview'
+                      ? 'bg-purple-500 text-white'
+                      : 'text-white/60 hover:text-white hover:bg-white/10'
+                  }`}
+                >
+                  👁️ Preview
+                </button>
+                <button
+                  onClick={() => setViewMode('code')}
+                  className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
+                    viewMode === 'code'
+                      ? 'bg-purple-500 text-white'
+                      : 'text-white/60 hover:text-white hover:bg-white/10'
+                  }`}
+                >
+                  💻 Code
+                </button>
+                <button
+                  onClick={() => setViewMode('split')}
+                  className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
+                    viewMode === 'split'
+                      ? 'bg-purple-500 text-white'
+                      : 'text-white/60 hover:text-white hover:bg-white/10'
+                  }`}
+                >
+                  🔀 Split
+                </button>
               </div>
-            )}
+              {sandboxId && (
+                <div className="text-xs text-white/60">
+                  Sandbox: {sandboxId}
+                </div>
+              )}
+            </div>
           </div>
 
           <div className="flex-1 p-6 overflow-auto">
-            {previewUrl ? (
-              <div className="h-full flex flex-col">
-                <div className="mb-4 p-3 bg-blue-500/20 border border-blue-500/30 rounded-xl">
-                  <div className="text-blue-400 text-sm flex items-center gap-2">
-                    <span>🌐 Preview URL:</span>
-                    <a
-                      href={previewUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-blue-300 hover:underline font-mono"
-                    >
-                      {previewUrl}
-                    </a>
+            {/* Preview Mode */}
+            {viewMode === 'preview' && (
+              <>
+                {previewUrl ? (
+                  <div className="h-full flex flex-col">
+                    <div className="mb-4 p-3 bg-blue-500/20 border border-blue-500/30 rounded-xl">
+                      <div className="text-blue-400 text-sm flex items-center gap-2">
+                        <span>🌐 Preview URL:</span>
+                        <a
+                          href={previewUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-blue-300 hover:underline font-mono"
+                        >
+                          {previewUrl}
+                        </a>
+                      </div>
+                    </div>
+                    <iframe
+                      src={previewUrl}
+                      className="flex-1 w-full bg-white rounded-xl border border-white/20"
+                      title="Preview"
+                      sandbox="allow-scripts allow-same-origin allow-forms"
+                    />
                   </div>
+                ) : previewCode ? (
+                  <iframe
+                    srcDoc={previewCode}
+                    className="w-full h-full bg-white rounded-xl border border-white/20"
+                    title="Preview"
+                    sandbox="allow-scripts"
+                  />
+                ) : (
+                  <div className="h-full flex items-center justify-center">
+                    <div className="text-center text-white/40">
+                      <svg className="w-24 h-24 mx-auto mb-4 opacity-20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                      </svg>
+                      <p className="text-lg">Preview will appear here</p>
+                      <p className="text-sm">Start by describing your project</p>
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+
+            {/* Code Mode */}
+            {viewMode === 'code' && (
+              <div className="h-full flex flex-col bg-gray-950 rounded-xl border border-white/20 overflow-hidden">
+                <div className="border-b border-white/10 px-4 py-2 flex items-center justify-between bg-gray-900">
+                  <span className="text-white/60 text-sm font-mono">HTML Source</span>
+                  <button
+                    onClick={handleCopyCode}
+                    className="px-3 py-1 bg-purple-500/20 text-purple-400 text-xs font-semibold rounded hover:bg-purple-500/30 transition-colors"
+                  >
+                    📋 Copy
+                  </button>
                 </div>
-                <iframe
-                  src={previewUrl}
-                  className="flex-1 w-full bg-white rounded-xl border border-white/20"
-                  title="Preview"
-                  sandbox="allow-scripts allow-same-origin allow-forms"
-                />
+                <div className="flex-1 overflow-auto p-4">
+                  {previewCode ? (
+                    <pre className="text-green-400 font-mono text-sm whitespace-pre-wrap break-words">
+                      {previewCode}
+                    </pre>
+                  ) : (
+                    <div className="h-full flex items-center justify-center text-white/40">
+                      <p>No code generated yet</p>
+                    </div>
+                  )}
+                </div>
               </div>
-            ) : previewCode ? (
-              <iframe
-                srcDoc={previewCode}
-                className="w-full h-full bg-white rounded-xl border border-white/20"
-                title="Preview"
-                sandbox="allow-scripts"
-              />
-            ) : (
-              <div className="h-full flex items-center justify-center">
-                <div className="text-center text-white/40">
-                  <svg className="w-24 h-24 mx-auto mb-4 opacity-20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                  </svg>
-                  <p className="text-lg">Preview will appear here</p>
-                  <p className="text-sm">Start by describing your project</p>
+            )}
+
+            {/* Split Mode */}
+            {viewMode === 'split' && (
+              <div className="h-full flex gap-4">
+                {/* Left: Preview */}
+                <div className="flex-1 flex flex-col">
+                  {previewUrl ? (
+                    <div className="h-full flex flex-col">
+                      <div className="mb-2 p-2 bg-blue-500/20 border border-blue-500/30 rounded-lg">
+                        <div className="text-blue-400 text-xs flex items-center gap-2">
+                          <span>🌐</span>
+                          <a
+                            href={previewUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-blue-300 hover:underline font-mono truncate"
+                          >
+                            {previewUrl}
+                          </a>
+                        </div>
+                      </div>
+                      <iframe
+                        src={previewUrl}
+                        className="flex-1 w-full bg-white rounded-lg border border-white/20"
+                        title="Preview"
+                        sandbox="allow-scripts allow-same-origin allow-forms"
+                      />
+                    </div>
+                  ) : previewCode ? (
+                    <iframe
+                      srcDoc={previewCode}
+                      className="w-full h-full bg-white rounded-lg border border-white/20"
+                      title="Preview"
+                      sandbox="allow-scripts"
+                    />
+                  ) : (
+                    <div className="h-full flex items-center justify-center border border-white/20 rounded-lg">
+                      <p className="text-white/40 text-sm">No preview</p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Right: Code */}
+                <div className="flex-1 flex flex-col bg-gray-950 rounded-lg border border-white/20 overflow-hidden">
+                  <div className="border-b border-white/10 px-4 py-2 flex items-center justify-between bg-gray-900">
+                    <span className="text-white/60 text-sm font-mono">HTML Source</span>
+                    <button
+                      onClick={handleCopyCode}
+                      className="px-3 py-1 bg-purple-500/20 text-purple-400 text-xs font-semibold rounded hover:bg-purple-500/30 transition-colors"
+                    >
+                      📋 Copy
+                    </button>
+                  </div>
+                  <div className="flex-1 overflow-auto p-4">
+                    {previewCode ? (
+                      <pre className="text-green-400 font-mono text-sm whitespace-pre-wrap break-words">
+                        {previewCode}
+                      </pre>
+                    ) : (
+                      <div className="h-full flex items-center justify-center text-white/40">
+                        <p className="text-sm">No code</p>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
             )}

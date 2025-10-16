@@ -19,16 +19,6 @@ export default function VoiceRecorder({ onTranscription, onError }: VoiceRecorde
   useEffect(() => {
     setMounted(true);
 
-    // Check if running in a secure context (HTTPS or localhost)
-    // Web Speech API requires HTTPS except on localhost
-    const isSecureContext = window.isSecureContext || window.location.hostname === 'localhost';
-
-    if (!isSecureContext) {
-      setIsSupported(false);
-      console.warn('⚠️ Web Speech API requires HTTPS. Please access via HTTPS to use voice input.');
-      return;
-    }
-
     // Check if Web Speech API is supported
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
 
@@ -36,6 +26,15 @@ export default function VoiceRecorder({ onTranscription, onError }: VoiceRecorde
       setIsSupported(false);
       console.warn('⚠️ Web Speech API not supported in this browser');
       return;
+    }
+
+    // Check if running in a secure context (HTTPS or localhost)
+    // Web Speech API requires HTTPS except on localhost
+    const isSecureContext = window.isSecureContext || window.location.hostname === 'localhost';
+
+    if (!isSecureContext) {
+      // Still show the button, but it will fail with a clear error message when clicked
+      console.warn('⚠️ Web Speech API requires HTTPS. Voice input will show an error when used.');
     }
 
     // Initialize SpeechRecognition
@@ -192,9 +191,20 @@ export default function VoiceRecorder({ onTranscription, onError }: VoiceRecorde
     );
   }
 
-  // Don't render if not supported (HTTPS required or browser incompatible)
+  // Don't render if not supported (only for browser incompatibility, not HTTPS)
   if (!isSupported) {
-    return null; // Hide the button completely when not supported
+    return (
+      <button
+        type="button"
+        disabled
+        className="p-3 rounded-xl bg-gray-700/50 border border-gray-600/50 text-gray-500 cursor-not-allowed"
+        title="Voice input not supported in this browser"
+      >
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
+        </svg>
+      </button>
+    );
   }
 
   return (
