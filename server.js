@@ -41,20 +41,18 @@ app.prepare().then(() => {
 
   const httpServer = createServer(requestHandler);
 
-  // Create HTTPS server if SSL certificates exist (for production)
+  // Create HTTPS server if SSL certificates exist (works in both dev and production)
   let httpsServer = null;
-  if (!dev) {
-    try {
-      const sslPath = join(__dirname, 'ssl');
-      const httpsOptions = {
-        key: readFileSync(join(sslPath, 'key.pem')),
-        cert: readFileSync(join(sslPath, 'cert.pem')),
-      };
-      httpsServer = createHttpsServer(httpsOptions, requestHandler);
-      console.log('✅ HTTPS enabled with self-signed certificate');
-    } catch (err) {
-      console.log('⚠️ HTTPS not available (certificates not found), using HTTP only');
-    }
+  try {
+    const sslPath = join(__dirname, 'ssl');
+    const httpsOptions = {
+      key: readFileSync(join(sslPath, 'key.pem')),
+      cert: readFileSync(join(sslPath, 'cert.pem')),
+    };
+    httpsServer = createHttpsServer(httpsOptions, requestHandler);
+    console.log('✅ HTTPS enabled with self-signed certificate');
+  } catch (err) {
+    console.log('⚠️ HTTPS not available (certificates not found), using HTTP only');
   }
 
   // Initialize Socket.io
