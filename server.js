@@ -18,7 +18,8 @@ const { Server } = require('socket.io');
 const { PrismaClient } = require('@prisma/client');
 
 const dev = process.env.NODE_ENV !== 'production';
-const hostname = dev ? 'localhost' : '0.0.0.0';
+// Use 0.0.0.0 to allow external connections, or localhost for local dev only
+const hostname = process.env.HOSTNAME || '0.0.0.0';
 const port = parseInt(process.env.PORT || '3000', 10);
 const httpsPort = parseInt(process.env.HTTPS_PORT || '3443', 10);
 
